@@ -11,7 +11,6 @@ SetupIconFile=icon.ico
 
 [Files]
 Source: "dist\\main.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "tracker.db"; DestDir: "{app}"; Flags: onlyifdoesntexist
 Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion  
 
 [Icons]

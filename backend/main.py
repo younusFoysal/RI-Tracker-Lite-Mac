@@ -1,4 +1,4 @@
-
+import os
 import webview
 import sqlite3
 import time
@@ -7,7 +7,17 @@ import requests
 import json
 from datetime import datetime
 
-db_file = 'tracker.db'
+
+
+APP_NAME = "RI_Tracker"
+DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
+
+# Ensure the directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Save db in local app data
+db_file = os.path.join(DATA_DIR, 'tracker.db')
+#db_file = 'tracker.db'
 
 def init_db():
     with sqlite3.connect(db_file) as conn:
@@ -81,8 +91,8 @@ class Api:
             print(f"Error clearing auth data: {e}")
             return False
 
-    def login(self, email, password):
-        """Login to the remote API and store the token"""
+    def login(self, email, password, remember_me=False):
+        """Login to the remote API and store the token if remember_me is True"""
         try:
             response = requests.post(
                 'https://remotintegrity-auth.vercel.app/api/v1/auth/login/employee',
@@ -95,7 +105,15 @@ class Api:
                 # Store token and user data
                 token = data['data']['token']
                 user_data = data['data']['employee']
-                self.save_auth_data(token, user_data)
+                
+                # Only save auth data if remember_me is True
+                if remember_me:
+                    self.save_auth_data(token, user_data)
+                else:
+                    # If not remembering, just set in memory but don't save to database
+                    self.auth_token = token
+                    self.user_data = user_data
+                    
                 return {"success": True, "data": data['data']}
             else:
                 return {"success": False, "message": data.get('message', 'Login failed')}

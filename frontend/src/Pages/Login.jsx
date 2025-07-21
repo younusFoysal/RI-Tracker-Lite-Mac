@@ -12,6 +12,7 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [rememberMe, setRememberMe] = useState(true);
     const { login } = useAuth();
 
 
@@ -22,7 +23,7 @@ const Login = () => {
         setError('');
         
         try {
-            const result = await login(email, password);
+            const result = await login(email, password, rememberMe);
             if (!result.success) {
                 setError(result.message);
             }
@@ -101,6 +102,8 @@ const Login = () => {
                             <input
                                 id="remember-me"
                                 type="checkbox"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
                                 className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                             />
                             <label htmlFor="remember-me" className="ml-2 text-gray-900">

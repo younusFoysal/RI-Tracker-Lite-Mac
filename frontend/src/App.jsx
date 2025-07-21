@@ -127,6 +127,8 @@ function AppContent() {
     const [showProfilePage, setShowProfilePage] = useState(false);
     const { isAuthenticated, logout, currentUser } = useAuth();
     const axiosSecure = useAxiosSecure()
+
+    console.log(currentUser, isAuthenticated);
     
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
