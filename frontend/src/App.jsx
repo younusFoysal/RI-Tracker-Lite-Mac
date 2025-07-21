@@ -3,6 +3,8 @@ import {BsThreeDotsVertical} from "react-icons/bs";
 import ProfilePage from './Pages/ProfilePage';
 import Login from "./Pages/Login";
 import { AuthProvider, useAuth } from './context/AuthContext';
+import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
+import {QueryClient, QueryClientProvider, useMutation, useQuery} from "@tanstack/react-query";
 
 // --- SVG Icon Components ---
 // These components replace the react-icons dependency to avoid build issues.
@@ -113,14 +115,18 @@ const CircularProgress = ({ percentage }) => {
     );
 };
 
+
+const queryClient = new QueryClient()
+
 // Main App Component
 function AppContent() {
     const [activeTab, setActiveTab] = useState('tracker');
     const [showDropdown, setShowDropdown] = useState(false);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-    const [selectedProject, setSelectedProject] = useState('RemoteIntegrity');
+    const [selectedProject, setSelectedProject] = useState('Loading...');
     const [showProfilePage, setShowProfilePage] = useState(false);
     const { isAuthenticated, logout, currentUser } = useAuth();
+    const axiosSecure = useAxiosSecure()
     
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
@@ -169,6 +175,30 @@ function AppContent() {
 
     const displayTime = formatTime(time);
 
+
+
+
+    // Fetch Employee Details
+    const { data: employee = {}, isLoading, refetch } = useQuery({
+        queryKey: ['employee'],
+        queryFn: async () => {
+            // Use the getProfile method from AuthContext instead of direct API call
+            const response = await window.pywebview.api.get_profile();
+            if (response.success) {
+                setSelectedProject(response.data?.companyId?.name);
+                return response.data;
+            }
+            return {};
+        }
+    });
+
+    console.log(employee);
+    console.log(employee?.companyId?.name);
+
+
+
+
+
     // Function to handle returning from profile page
     const handleCloseProfile = () => {
         setShowProfilePage(false);
@@ -189,7 +219,8 @@ function AppContent() {
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">What are you working on?</h2>
                         <div className="space-y-3">
                             <div className="relative project-dropdown-container">
-                                <button 
+                                <button
+                                    disabled
                                     className="w-full flex justify-between items-center bg-white border border-gray-300 rounded-md py-3 px-4 leading-tight focus:outline-none focus:border-blue-800 focus:ring-1 focus:ring-blue-800"
                                     onClick={() => setShowProjectDropdown(!showProjectDropdown)}
                                 >
@@ -306,9 +337,11 @@ function AppContent() {
 // Wrapper component that provides authentication context and conditional rendering
 export default function App() {
     return (
-        <AuthProvider>
-            <AuthenticatedApp />
-        </AuthProvider>
+        <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+                <AuthenticatedApp />
+            </AuthProvider>
+        </QueryClientProvider>
     );
 }
 

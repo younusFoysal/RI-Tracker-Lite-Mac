@@ -1,4 +1,5 @@
 import React from 'react';
+import userAvatar from "/userAvatar.png"
 
 // --- SVG Icon Components (Unchanged) ---
 // Using inline SVGs to avoid potential build issues with external libraries.
@@ -68,24 +69,30 @@ const MenuItem = ({ icon, text }) => (
 
 // Main Profile Page Component
 export default function ProfilePage({ user, onClose }) {
+    console.log(user);
     // List of services the user is being monitored for.
     const monitoringItems = user.roleId.modules.filter(item => item !== 'Dashboard' && item !== 'profile' && item !== 'Guides');
 
     return (
-        <div className="bg-gray-50 min-h-screen flex items-center justify-center font-sans">
-            <div className="w-full max-w-sm bg-white rounded-2xl  flex flex-col overflow-hidden">
+        <div className="bg-gray-50  flex items-center justify-center font-sans">
+            <div className="w-full max-w-sm min-h-screen rounded-2xl  flex flex-col overflow-hidden">
 
                 {/* Header */}
                 <header className="p-6">
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="flex justify-between items-start mb-10">
                         <div className="flex items-center gap-4">
                             {/* User Avatar */}
                             <img
-                                src={user.avatar}
+                                //src={user.avatar}
+                                src={
+                                    user?.avatar
+                                        ? user?.avatar
+                                        : userAvatar
+                                }
                                 alt="User Avatar"
                                 className="h-16 w-16 rounded-full object-cover border-2 border-indigo-200"
                                 // Fallback in case the image link is broken
-                                onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/64x64/E0E7FF/A5B4FC?text=User'; }}
+                                onError={(e) => { e.target.onerror = null; e.target.src = 'userAvatar'; }}
                             />
                             <div>
                                 {/* User Name and Email */}
@@ -93,31 +100,18 @@ export default function ProfilePage({ user, onClose }) {
                                 <p className="text-sm text-gray-500">{user.email}</p>
                             </div>
                         </div>
-                        <button
-                            className="text-gray-400 hover:text-gray-600"
-                            onClick={onClose}
-                        >
-                            <IconX className="h-6 w-6" />
-                        </button>
                     </div>
 
-                    {/* Plan Card */}
+                    {/* User Info Card */}
                     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                             <span className="text-gray-500 text-sm">Role</span>
                             {/* User Role, capitalized */}
                             <span className="font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md text-sm capitalize">{user.roleId.roleName}</span>
                         </div>
-                        <p className="text-gray-600 font-semibold mb-3 text-sm">RI Tracker is monitoring your:</p>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
-                            {monitoringItems.map(item => (
-                                <div key={item} className="flex items-center gap-2">
-                                    <IconCheck className="h-5 w-5 text-green-500" />
-                                    <span>{item}</span>
-                                </div>
-                            ))}
-                        </div>
+                        <p className="text-gray-600 font-semibold mb-2 text-sm">RI Tracker is monitoring your work hours.</p>
                     </div>
+
                 </header>
 
                 {/* Menu List */}
@@ -129,13 +123,13 @@ export default function ProfilePage({ user, onClose }) {
                 </nav>
 
                 {/* Footer / Sign Out */}
-                <footer className="p-3 border-t border-gray-200">
+                <footer className="p-3 mt-4 border-t border-gray-200">
 
-                    <div className="flex items-center justify-center font-bold p-3 rounded-[4px] bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors">
+                    <div className="flex items-center justify-center font-semibold p-3 rounded-[4px] bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors">
                         <button className="flex items-center gap-4"
                                 onClick={onClose}
                         >
-                            <IconSignOut className="h-6 w-6 text-gray-400"/>
+                            <IconSignOut className="h-6 w-6 text-gray-600"/>
                             <span className="text-gray-600">Go Back</span>
                         </button>
                     </div>

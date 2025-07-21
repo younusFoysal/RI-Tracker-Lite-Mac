@@ -14,51 +14,6 @@ const Login = () => {
     const [error, setError] = useState('');
     const { login } = useAuth();
 
-    // API - POST - https://remotintegrity-auth.vercel.app
-    // body -
-    // {
-    //     "email": "test@test.com",
-    //     "password": "123456"
-    // }
-    // Response -
-    // {
-    //     "success": true,
-    //     "message": "Employee is logged in successfully!",
-    //     "data": {
-    //     "employee": {
-    //         "_id": "68570556049a6f01dd18cda7",
-    //             "username": "testuser",
-    //             "name": "Test User",
-    //             "email": "test@test.com",
-    //             "password": "$2b$10$kIgl2agu3ZErLr8BPkODqeH84Qp5L3gT0eZWcu1KeYooxAUGEyJtq",
-    //             "avatar": "https://i.ibb.co/ZzLC3NQR/man-Avater.jpg",
-    //             "roleId": {
-    //             "_id": "685a3458ab3b53d133344a50",
-    //                 "roleName": "employee",
-    //                 "modules": [
-    //                 "Dashboard",
-    //                 "workHours",
-    //                 "profile",
-    //                 "Guides"
-    //             ]
-    //         },
-    //         "employeeId": "687c77e6873a193e1f6cff43",
-    //             "role": "user",
-    //             "status": "active",
-    //             "note": "New User",
-    //             "isDeleted": false,
-    //             "isBlocked": false,
-    //             "needsPasswordChange": false,
-    //             "isEmailVerified": false,
-    //             "createdAt": "2025-06-21T19:17:42.131Z",
-    //             "updatedAt": "2025-07-07T19:07:30.970Z",
-    //             "__v": 0,
-    //             "division": "",
-    //             "position": ""
-    //     },
-    //     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODU3MDU1NjA0OWE2ZjAxZGQxOGNkYTciLCJ1c2VybmFtZSI6InRlc3R1c2VyIiwibmFtZSI6IlRlc3QgVXNlciIsImVtYWlsIjoidGVzdEB0ZXN0LmNvbSIsInJvbGUiOiJ1c2VyIiwiYXZhdGFyIjoiaHR0cHM6Ly9pLmliYi5jby9aekxDM05RUi9tYW4tQXZhdGVyLmpwZyIsInBvc2l0aW9uIjoiIiwicm9sZUlkIjp7Il9pZCI6IjY4NWEzNDU4YWIzYjUzZDEzMzM0NGE1MCIsInJvbGVOYW1lIjoiZW1wbG95ZWUiLCJtb2R1bGVzIjpbIkRhc2hib2FyZCIsIndvcmtIb3VycyIsInByb2ZpbGUiLCJHdWlkZXMiXX0sInN0YXR1cyI6ImFjdGl2ZSIsImlzRGVsZXRlZCI6ZmFsc2UsImlzQmxvY2tlZCI6ZmFsc2UsIm5lZWRzUGFzc3dvcmRDaGFuZ2UiOmZhbHNlLCJpc0VtYWlsVmVyaWZpZWQiOmZhbHNlLCJpYXQiOjE3NTMwOTQ0NzUsImV4cCI6MTc1Mzk1ODQ3NX0.nRrVZLstLbIyHO0sGYP6peVLQ6ZgpJyutLGInM6jEvw",
-    //     }
-    // }
 
 
     const handleLogin = async (e) => {
