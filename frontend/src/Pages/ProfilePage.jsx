@@ -1,15 +1,7 @@
 import React from 'react';
 
-// --- SVG Icon Components ---
+// --- SVG Icon Components (Unchanged) ---
 // Using inline SVGs to avoid potential build issues with external libraries.
-
-const IconUser = ({ className }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="10" fill="#E0E7FF"/>
-        <circle cx="12" cy="10" r="3" fill="#A5B4FC"/>
-        <path d="M17.9691 20C17.81 17.1088 15.2376 15 12 15C8.76245 15 6.19003 17.1088 6.03089 20" fill="#C7D2FE"/>
-    </svg>
-);
 
 const IconX = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -25,23 +17,15 @@ const IconCheck = ({ className }) => (
 );
 
 const IconDashboard = ({ className }) => (
-     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
         <line x1="3" y1="9" x2="21" y2="9"></line>
         <line x1="9" y1="21" x2="9" y2="9"></line>
     </svg>
 );
 
-const IconWarning = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-        <line x1="12" y1="9" x2="12" y2="13"></line>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-    </svg>
-);
-
 const IconInfo = ({ className }) => (
-     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
+    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <circle cx="12" cy="12" r="10"></circle>
         <line x1="12" y1="16" x2="12" y2="12"></line>
         <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -62,20 +46,6 @@ const IconPencil = ({ className }) => (
     </svg>
 );
 
-const IconSun = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-    </svg>
-);
-
 const IconSignOut = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -86,36 +56,44 @@ const IconSignOut = ({ className }) => (
 
 
 // MenuItem component for cleaner code
-const MenuItem = ({ icon, text, rightIcon }) => (
+const MenuItem = ({ icon, text }) => (
     <a href="#" className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors">
         <div className="flex items-center gap-4">
             {icon}
             <span>{text}</span>
         </div>
-        {rightIcon && <div>{rightIcon}</div>}
     </a>
 );
 
 
 // Main Profile Page Component
-export default function ProfilePage({ onClose }) {
-    const monitoringItems = ['Screenshots', 'Apps', 'URLs', 'Activities'];
+export default function ProfilePage({ user, onClose }) {
+    // List of services the user is being monitored for.
+    const monitoringItems = user.roleId.modules.filter(item => item !== 'Dashboard' && item !== 'profile' && item !== 'Guides');
 
     return (
-        <div className=" min-h-screen flex items-center justify-center font-sans">
-            <div className="w-full max-w-sm bg-white rounded-lg  flex flex-col">
+        <div className="bg-gray-50 min-h-screen flex items-center justify-center font-sans">
+            <div className="w-full max-w-sm bg-white rounded-2xl  flex flex-col overflow-hidden">
 
                 {/* Header */}
                 <header className="p-6">
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-4">
-                            <IconUser className="h-16 w-16" />
+                            {/* User Avatar */}
+                            <img
+                                src={user.avatar}
+                                alt="User Avatar"
+                                className="h-16 w-16 rounded-full object-cover border-2 border-indigo-200"
+                                // Fallback in case the image link is broken
+                                onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/64x64/E0E7FF/A5B4FC?text=User'; }}
+                            />
                             <div>
-                                <h2 className="font-bold text-lg text-gray-800">Foysal</h2>
-                                <p className="text-sm text-gray-500">foysal@remoteintegrity.com</p>
+                                {/* User Name and Email */}
+                                <h2 className="font-bold text-lg text-gray-800">{user.name}</h2>
+                                <p className="text-sm text-gray-500">{user.email}</p>
                             </div>
                         </div>
-                        <button 
+                        <button
                             className="text-gray-400 hover:text-gray-600"
                             onClick={onClose}
                         >
@@ -124,12 +102,13 @@ export default function ProfilePage({ onClose }) {
                     </div>
 
                     {/* Plan Card */}
-                    <div className="border border-gray-200 rounded-xl p-4">
+                    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
-                            <span className="text-gray-500">User</span>
-                            <span className="font-bold text-blue-800">Employee</span>
+                            <span className="text-gray-500 text-sm">Role</span>
+                            {/* User Role, capitalized */}
+                            <span className="font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md text-sm capitalize">{user.roleId.roleName}</span>
                         </div>
-                        <p className="text-yellow-500 font-semibold mb-3">RI Tracker is monitoring your:</p>
+                        <p className="text-gray-600 font-semibold mb-3 text-sm">RI Tracker is monitoring your:</p>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
                             {monitoringItems.map(item => (
                                 <div key={item} className="flex items-center gap-2">
@@ -144,18 +123,27 @@ export default function ProfilePage({ onClose }) {
                 {/* Menu List */}
                 <nav className="flex-grow px-3 pb-3">
                     <MenuItem icon={<IconDashboard className="h-6 w-6 text-gray-400"/>} text="Go To Dashboard" />
-                    <MenuItem icon={<IconWarning className="h-6 w-6 text-gray-400"/>} text="Send Diagnostic Data" />
-                    <MenuItem icon={<IconInfo className="h-6 w-6 text-gray-400"/>} text="About Apploye" />
+                    <MenuItem icon={<IconInfo className="h-6 w-6 text-gray-400"/>} text="About RI Tracker" />
                     <MenuItem icon={<IconDownload className="h-6 w-6 text-gray-400"/>} text="Check For Updates" />
-                    {/*<MenuItem icon={<IconPencil className="h-6 w-6 text-gray-400"/>} text="Support" rightIcon={<IconSun className="h-6 w-6 text-gray-500"/>}*/}
                     <MenuItem icon={<IconPencil className="h-6 w-6 text-gray-400"/>} text="Support" />
                 </nav>
 
                 {/* Footer / Sign Out */}
                 <footer className="p-3 border-t border-gray-200">
-                     <MenuItem icon={<IconSignOut className="h-6 w-6 text-gray-400"/>} text="Sign Out" />
+
+                    <div className="flex items-center justify-center font-bold p-3 rounded-[4px] bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors">
+                        <button className="flex items-center gap-4"
+                                onClick={onClose}
+                        >
+                            <IconSignOut className="h-6 w-6 text-gray-400"/>
+                            <span className="text-gray-600">Go Back</span>
+                        </button>
+                    </div>
+
+
                 </footer>
             </div>
         </div>
     );
 }
+

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {BsThreeDotsVertical} from "react-icons/bs";
 import ProfilePage from './Pages/ProfilePage';
+import Login from "./Pages/Login";
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // --- SVG Icon Components ---
 // These components replace the react-icons dependency to avoid build issues.
@@ -112,12 +114,13 @@ const CircularProgress = ({ percentage }) => {
 };
 
 // Main App Component
-export default function App() {
+function AppContent() {
     const [activeTab, setActiveTab] = useState('tracker');
     const [showDropdown, setShowDropdown] = useState(false);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     const [selectedProject, setSelectedProject] = useState('RemoteIntegrity');
     const [showProfilePage, setShowProfilePage] = useState(false);
+    const { isAuthenticated, logout, currentUser } = useAuth();
     
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
@@ -171,25 +174,14 @@ export default function App() {
         setShowProfilePage(false);
     };
 
+    // If profile page is shown, render it
     if (showProfilePage) {
-        return <ProfilePage onClose={handleCloseProfile} />;
+        return <ProfilePage user={currentUser}  onClose={handleCloseProfile} />;
     }
 
     return (
-        <div className=" min-h-screen flex items-center justify-center font-sans">
-            <div className="w-full max-w-sm bg-gray-50  rounded-lg overflow-hidden">
-                {/* Custom Title Bar */}
-                {/*<header className="bg-white flex justify-between items-center p-2 border-b border-gray-200">*/}
-                {/*    <div className="flex items-center gap-2">*/}
-                {/*        <IconBuffer className="text-teal-500 h-5 w-5" />*/}
-                {/*        <span className="font-semibold text-gray-700">RI Tracker</span>*/}
-                {/*    </div>*/}
-                {/*    <div className="flex items-center gap-4 text-gray-500">*/}
-                {/*        <IconMinus className="cursor-pointer hover:text-gray-800 h-5 w-5" />*/}
-                {/*        <IconSquare className="cursor-pointer hover:text-gray-800 h-5 w-5" />*/}
-                {/*        <IconX className="cursor-pointer hover:text-red-500 h-5 w-5" />*/}
-                {/*    </div>*/}
-                {/*</header>*/}
+        <div className="min-h-screen flex items-center justify-center font-sans">
+            <div className="w-full max-w-sm bg-gray-50 rounded-lg overflow-hidden">
 
                 <main className="p-6 space-y-6">
                     {/* Project Selection Section */}
@@ -289,7 +281,7 @@ export default function App() {
                                 <button 
                                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                                     onClick={() => {
-                                        console.log('Logout clicked');
+                                        logout();
                                         setShowDropdown(false);
                                     }}
                                 >
@@ -304,7 +296,35 @@ export default function App() {
                         <span>Sync</span>
                     </button>
                 </footer>
+
             </div>
+
         </div>
     );
+}
+
+// Wrapper component that provides authentication context and conditional rendering
+export default function App() {
+    return (
+        <AuthProvider>
+            <AuthenticatedApp />
+        </AuthProvider>
+    );
+}
+
+// Component that handles conditional rendering based on authentication status
+function AuthenticatedApp() {
+    const { isAuthenticated, loading } = useAuth();
+    
+    // Show loading indicator while checking authentication status
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <p className="text-gray-600">Loading...</p>
+            </div>
+        );
+    }
+    
+    // Show Login page if not authenticated, otherwise show the app content
+    return isAuthenticated() ? <AppContent /> : <Login />;
 }
