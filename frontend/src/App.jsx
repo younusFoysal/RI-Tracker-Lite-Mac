@@ -128,7 +128,7 @@ function AppContent() {
     const { isAuthenticated, logout, currentUser } = useAuth();
     const axiosSecure = useAxiosSecure()
 
-    console.log(currentUser, isAuthenticated);
+    console.log(currentUser);
     
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
@@ -151,8 +151,10 @@ function AppContent() {
     }, [showDropdown, showProjectDropdown]);
 
     // State for the timer
-    const [time, setTime] = useState(0); // Initial time in seconds (00:25:24)
-    const [isRunning, setIsRunning] = useState(true);
+    const [time, setTime] = useState(0); // Initial time in seconds
+    const [isRunning, setIsRunning] = useState(false);
+    const [sessionInfo, setSessionInfo] = useState(null);
+    const [timerError, setTimerError] = useState(null);
 
     // Effect to handle the timer logic
     useEffect(() => {
@@ -195,7 +197,50 @@ function AppContent() {
     });
 
     console.log(employee);
-    console.log(employee?.companyId?.name);
+    // employee id
+    console.log(currentUser?.employeeId);
+
+    // Company id
+    console.log(employee?.companyId?._id);
+
+
+
+    // send session
+    // API - POST - PATCH - https://tracker-beta-kohl.vercel.app/api/v1/sessions/ - With Bearer Token
+    // Body -
+    // {
+    //     "employeeId": "687c77e6873a193e1f6cff43",
+    //     "companyId": "6852cf7cb225521271b2452d",
+    //     "startTime": "2025-06-29T08:00:00.000Z",     // UTC
+    //     "endTime": "2025-06-29T10:00:00.000Z",       // UTC
+    //     "activeTime": 90,  // Second
+    //     "idleTime": 30,   // Second
+    //     "keyboardActivityRate": 100,   // Second
+    //     "mouseActivityRate": 1200,    // Second
+    //     "notes": "Session from RI Tracker APP v1."
+    // }
+    // Response -
+    // {
+    //     "success": true,
+    //     "message": "Session created successfully",
+    //     "data": {
+    //     "employeeId": "687c77e6873a193e1f6cff43",
+    //         "companyId": "6852cf7cb225521271b2452d",
+    //         "startTime": "2025-06-29T08:00:00.000Z",
+    //         "endTime": "2025-06-29T10:00:00.000Z",
+    //         "activeTime": 90,
+    //         "idleTime": 30,
+    //         "notes": "Session from Postman.",
+    //         "timezone": "UTC",
+    //         "isDeleted": false,
+    //         "mouseActivityRate": 1200,
+    //         "keyboardActivityRate": 100,
+    //         "_id": "687eab67026f5aab54d69cd2",
+    //         "createdAt": "2025-07-21T21:04:39.235Z",
+    //         "updatedAt": "2025-07-21T21:04:39.235Z",
+    //         "__v": 0
+    // }
+    // }
 
 
 
@@ -257,7 +302,37 @@ function AppContent() {
                         </div>
                         <div className="relative">
                             <button
-                                onClick={() => setIsRunning(!isRunning)}
+                                onClick={async () => {
+                                    try {
+                                        setTimerError(null);
+                                        
+                                        if (!isRunning) {
+                                            // Start the timer
+                                            const result = await window.pywebview.api.start_timer(selectedProject);
+                                            if (result.success) {
+                                                setSessionInfo(result.data);
+                                                setIsRunning(true);
+                                            } else {
+                                                setTimerError(result.message || "Failed to start timer");
+                                                console.error("Timer start error:", result.message);
+                                            }
+                                        } else {
+                                            // Stop the timer
+                                            const result = await window.pywebview.api.stop_timer();
+                                            if (result.success) {
+                                                setSessionInfo(null);
+                                                setIsRunning(false);
+                                                setTime(0); // Reset timer to 0
+                                            } else {
+                                                setTimerError(result.message || "Failed to stop timer");
+                                                console.error("Timer stop error:", result.message);
+                                            }
+                                        }
+                                    } catch (error) {
+                                        console.error("Timer operation error:", error);
+                                        setTimerError("An error occurred during timer operation");
+                                    }
+                                }}
                                 className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-colors ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-[#002B91] hover:bg-blue-800'}`}
                             >
                                 {isRunning ? (
@@ -266,6 +341,11 @@ function AppContent() {
                                     <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-1"></div>
                                 )}
                             </button>
+                            {timerError && (
+                                <div className="absolute top-full right-0 mt-2 text-xs text-red-500">
+                                    {timerError}
+                                </div>
+                            )}
                         </div>
                     </div>
 

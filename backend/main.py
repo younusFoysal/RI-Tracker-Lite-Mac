@@ -5,7 +5,7 @@ import time
 import sys
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 
@@ -43,6 +43,11 @@ class Api:
         self.current_project = None
         self.auth_token = None
         self.user_data = None
+        self.session_id = None
+        self.active_time = 0
+        self.idle_time = 0
+        self.keyboard_activity_rate = 0
+        self.mouse_activity_rate = 0
         self.load_auth_data()
 
     def load_auth_data(self):
@@ -164,21 +169,157 @@ class Api:
             return {"success": True, "user": self.user_data}
         return {"success": False, "message": "No user data available"}
 
+    def create_session(self):
+        """Create a new session via API"""
+        if not self.auth_token:
+            return {"success": False, "message": "Not authenticated"}
+        
+        try:
+            # Get employee and company IDs
+            employee_id = self.user_data.get('employeeId')
+            company_id = None
+            
+            # Try to get company ID from user data first
+            if self.user_data.get('companyId'):
+                if isinstance(self.user_data['companyId'], dict):
+                    company_id = self.user_data['companyId'].get('_id')
+                else:
+                    company_id = self.user_data['companyId']
+            
+            if not employee_id or not company_id:
+                # If not found in user_data, try to get from profile
+                profile = self.get_profile()
+                if profile.get('success') and profile.get('data'):
+                    if not employee_id:
+                        employee_id = profile['data'].get('_id')
+                    if not company_id and profile['data'].get('companyId'):
+                        if isinstance(profile['data']['companyId'], dict):
+                            company_id = profile['data']['companyId'].get('_id')
+                        else:
+                            company_id = profile['data']['companyId']
+            
+            if not employee_id or not company_id:
+                return {"success": False, "message": "Employee ID or Company ID not found"}
+            
+            # Create session data
+            #start_time = datetime.utcnow().isoformat() + 'Z'  # UTC time in ISO format
+            #start_time = datetime.now(timezone.utc).isoformat()
+            start_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+            #start_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+            # Optional: Ensure it ends with 'Z' if you want ISO 8601 compatibility
+            # if not start_time.endswith('Z'):
+            #     start_time = start_time.replace('+00:00', 'Z')
+
+
+            session_data = {
+                "employeeId": employee_id,
+                "companyId": company_id,
+                "startTime": start_time,
+                "notes": "Session from RI Tracker APP v1.",
+                "timezone": "America/New_York"
+            }
+            
+            # Send request to create session
+            response = requests.post(
+                'https://tracker-beta-kohl.vercel.app/api/v1/sessions/',
+                json=session_data,
+                headers={
+                    "Authorization": f"Bearer {self.auth_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            data = response.json()
+            
+            if data.get('success'):
+                self.session_id = data['data']['_id']
+                return {"success": True, "data": data['data']}
+            else:
+                return {"success": False, "message": data.get('message', 'Failed to create session')}
+        except Exception as e:
+            print(f"Create session error: {e}")
+            return {"success": False, "message": f"An error occurred: {str(e)}"}
+    
+    def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0):
+        """Update an existing session via API"""
+        if not self.auth_token or not self.session_id:
+            return {"success": False, "message": "Not authenticated or no active session"}
+        
+        try:
+            # Create session update data
+            #end_time = datetime.utcnow().isoformat() + 'Z'  # UTC time in ISO format
+            #end_time = datetime.now(timezone.utc).isoformat()
+            end_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            #end_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+            update_data = {
+                "endTime": end_time,
+                "activeTime": active_time,
+                "idleTime": idle_time,
+                "keyboardActivityRate": keyboard_rate,
+                "mouseActivityRate": mouse_rate,
+                "timezone": "America/New_York"
+            }
+            
+            # Send request to update session
+            response = requests.patch(
+                f'https://tracker-beta-kohl.vercel.app/api/v1/sessions/{self.session_id}',
+                json=update_data,
+                headers={
+                    "Authorization": f"Bearer {self.auth_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            
+            data = response.json()
+            
+            if data.get('success'):
+                self.session_id = None
+                return {"success": True, "data": data['data']}
+            else:
+                return {"success": False, "message": data.get('message', 'Failed to update session')}
+        except Exception as e:
+            print(f"Update session error: {e}")
+            return {"success": False, "message": f"An error occurred: {str(e)}"}
+    
     def start_timer(self, project_name):
+        """Start the timer and create a new session"""
         self.start_time = time.time()
         self.current_project = project_name
+        self.active_time = 0
+        self.idle_time = 0
+        
+        # Create a new session
+        result = self.create_session()
+        return result
 
     def stop_timer(self):
+        """Stop the timer and update the session"""
         if self.start_time:
+            # Calculate duration
             duration = int(time.time() - self.start_time)
+            self.active_time = duration
+            
+            # Store in local database
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             with sqlite3.connect(db_file) as conn:
                 conn.execute(
                     'INSERT INTO time_entries (project_name, timestamp, duration) VALUES (?, ?, ?)',
                     (self.current_project, timestamp, duration)
                 )
+            
+            # Update the session
+            result = self.update_session(active_time=duration)
+            
+            # Reset timer state
             self.start_time = None
             self.current_project = None
+            
+            return result
+        
+        return {"success": False, "message": "Timer not running"}
 
     def get_time_entries(self):
         with sqlite3.connect(db_file) as conn:
@@ -191,7 +332,7 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = False
+    DEBUG = True
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 
