@@ -9,20 +9,17 @@ from datetime import datetime, timezone
 from config import URLS, APP_ENV
 
 
-
 APP_NAME = "RI_Tracker"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
 # Ensure the directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
+
+
 # Save db in local app data
 db_file = os.path.join(DATA_DIR, 'tracker.db')
 #db_file = 'tracker.db'
-
-LOGIN_URL = URLS["LOGIN"]
-PROFILE_URL = URLS["PROFILE"]
-SESSIONS_URL = URLS["SESSIONS"]
 
 def init_db():
     with sqlite3.connect(db_file) as conn:
@@ -101,11 +98,11 @@ class Api:
             print(f"Error clearing auth data: {e}")
             return False
 
-    def login(self, email, password, remember_me=True):
+    def login(self, email, password, remember_me=False):
         """Login to the remote API and store the token if remember_me is True"""
         try:
             response = requests.post(
-                LOGIN_URL,
+                URLS["LOGIN"],
                 json={"email": email, "password": password},
                 headers={"Content-Type": "application/json"}
             )
@@ -143,7 +140,7 @@ class Api:
                 return {"success": False, "message": "Employee ID not found"}
                 
             response = requests.get(
-                f'{PROFILE_URL}/{employee_id}',
+                f'{URLS['PROFILE']}/{employee_id}',
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
@@ -222,13 +219,13 @@ class Api:
                 "employeeId": employee_id,
                 "companyId": company_id,
                 "startTime": start_time,
-                "notes": "Session from RI Tracker APP v1.",
+                "notes": "Session from RI Tracker Lite APP v1.",
                 "timezone": "America/New_York"
             }
             
             # Send request to create session
             response = requests.post(
-                SESSIONS_URL,
+                URLS["SESSIONS"],
                 json=session_data,
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
@@ -270,7 +267,7 @@ class Api:
             
             # Send request to update session
             response = requests.patch(
-                f'{SESSIONS_URL}/{self.session_id}',
+                f'{URLS["SESSIONS"]}/{self.session_id}',
                 json=update_data,
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
@@ -337,7 +334,7 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = False
+    DEBUG = True
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 
