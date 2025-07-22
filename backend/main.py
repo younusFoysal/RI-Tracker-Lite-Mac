@@ -66,6 +66,10 @@ class Api:
         self.stats_timer = None
         self.stats_update_interval = 600  # 10 minutes in seconds
         
+        # Session update variables
+        self.session_update_timer = None
+        self.session_update_interval = 600  # 10 minutes in seconds
+        
         # Throttling variables to prevent excessive event counting
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
@@ -256,8 +260,16 @@ class Api:
             print(f"Create session error: {e}")
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
-    def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0):
-        """Update an existing session via API"""
+    def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0, is_final_update=False):
+        """Update an existing session via API
+        
+        Args:
+            active_time: Time spent actively working (in seconds)
+            idle_time: Time spent idle (in seconds)
+            keyboard_rate: Keyboard activity rate (events per minute)
+            mouse_rate: Mouse activity rate (events per minute)
+            is_final_update: Whether this is the final update (when timer is stopped)
+        """
         if not self.auth_token or not self.session_id:
             return {"success": False, "message": "Not authenticated or no active session"}
         
@@ -287,7 +299,9 @@ class Api:
             data = response.json()
             
             if data.get('success'):
-                self.session_id = None
+                # Only reset session_id if this is the final update
+                if is_final_update:
+                    self.session_id = None
                 return {"success": True, "data": data['data']}
             else:
                 return {"success": False, "message": data.get('message', 'Failed to update session')}
@@ -329,6 +343,60 @@ class Api:
         if self.stats_timer:
             self.stats_timer.cancel()
             self.stats_timer = None
+            
+    def start_session_updates(self):
+        """Start periodic session updates"""
+        if self.session_update_timer:
+            return
+            
+        def update_session_periodically():
+            if not self.start_time:
+                return
+                
+            # Update activity metrics
+            self.update_activity_metrics()
+            
+            # Get current activity stats
+            current_time = time.time()
+            
+            # Perform final activity check
+            if self.last_active_check_time is not None:
+                if self.is_idle:
+                    # Add idle time
+                    idle_time = current_time - self.last_active_check_time
+                    self.idle_time += idle_time
+                    self.last_active_check_time = current_time
+                else:
+                    # Add active time
+                    active_time = current_time - self.last_active_check_time
+                    self.active_time += active_time
+                    self.last_active_check_time = current_time
+            
+            # Update the session with current metrics (not final update)
+            result = self.update_session(
+                active_time=int(self.active_time),
+                idle_time=int(self.idle_time),
+                keyboard_rate=self.keyboard_activity_rate,
+                mouse_rate=self.mouse_activity_rate,
+                is_final_update=False
+            )
+            
+            # Schedule the next update if timer is still running
+            if self.start_time:
+                self.session_update_timer = threading.Timer(self.session_update_interval, update_session_periodically)
+                self.session_update_timer.daemon = True
+                self.session_update_timer.start()
+        
+        # Start the session update timer
+        self.session_update_timer = threading.Timer(self.session_update_interval, update_session_periodically)
+        self.session_update_timer.daemon = True
+        self.session_update_timer.start()
+        
+    def stop_session_updates(self):
+        """Stop periodic session updates"""
+        if self.session_update_timer:
+            self.session_update_timer.cancel()
+            self.session_update_timer = None
     
     def start_timer(self, project_name):
         """Start the timer and create a new session"""
@@ -357,6 +425,9 @@ class Api:
         
         # Create a new session
         result = self.create_session()
+        
+        # Start session updates (every 10 minutes)
+        self.start_session_updates()
         
         # Add stats to the result
         if result.get("success"):
@@ -388,6 +459,9 @@ class Api:
             # Stop activity tracking
             self.stop_activity_tracking()
             
+            # Stop session updates
+            self.stop_session_updates()
+            
             # Calculate total duration
             duration = int(current_time - self.start_time)
             
@@ -410,12 +484,13 @@ class Api:
                     (self.current_project, timestamp, duration)
                 )
             
-            # Update the session with all metrics
+            # Update the session with all metrics (final update)
             result = self.update_session(
                 active_time=self.active_time,
                 idle_time=self.idle_time,
                 keyboard_rate=self.keyboard_activity_rate,
-                mouse_rate=self.mouse_activity_rate
+                mouse_rate=self.mouse_activity_rate,
+                is_final_update=True
             )
             
             # Stop stats updates
