@@ -6,6 +6,18 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
 import {QueryClient, QueryClientProvider, useMutation, useQuery} from "@tanstack/react-query";
 
+// Add this CSS at the top of your component file
+const rotationStyles = `
+  @keyframes rotateSync {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(720deg); }
+  }
+  
+  .rotate-sync {
+    animation: rotateSync 1s linear;
+  }
+`;
+
 // --- SVG Icon Components ---
 // These components replace the react-icons dependency to avoid build issues.
 
@@ -125,16 +137,15 @@ function AppContent() {
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     const [selectedProject, setSelectedProject] = useState('Loading...');
     const [showProfilePage, setShowProfilePage] = useState(false);
-    const [isRotating, setIsRotating] = useState(false);
-
+    const [isRotating, setIsRotating] = useState(false); // Add this state
     const { isAuthenticated, logout, currentUser } = useAuth();
     const axiosSecure = useAxiosSecure()
 
     console.log(currentUser);
-    
+
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
-    
+
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -157,7 +168,7 @@ function AppContent() {
     const [isRunning, setIsRunning] = useState(false);
     const [sessionInfo, setSessionInfo] = useState(null);
     const [timerError, setTimerError] = useState(null);
-    
+
     // State for stats
     const [dailyStats, setDailyStats] = useState({
         totalHours: 0,
@@ -178,25 +189,25 @@ function AppContent() {
                 // Get updated stats
                 const dailyResult = await window.pywebview.api.get_daily_stats();
                 const weeklyResult = await window.pywebview.api.get_weekly_stats();
-                
+
                 if (dailyResult.success) {
                     setDailyStats(dailyResult.data);
                 }
-                
+
                 if (weeklyResult.success) {
                     setWeeklyStats(weeklyResult.data);
                 }
-                
+
                 setStatsLastUpdated(new Date());
             } catch (error) {
                 console.error("Initial stats fetch error:", error);
             }
         };
-        
+
         // Fetch stats when component mounts
         fetchInitialStats();
     }, []);
-    
+
     // Effect to handle the timer logic
     useEffect(() => {
         let interval = null;
@@ -204,28 +215,28 @@ function AppContent() {
             interval = setInterval(() => {
                 setTime(prevTime => prevTime + 1);
             }, 1000);
-            
+
             // Add event listeners for activity tracking
             const handleKeyDown = () => {
                 window.pywebview.api.record_keyboard_activity();
             };
-            
+
             const handleMouseMove = () => {
                 window.pywebview.api.record_mouse_activity();
             };
-            
+
             const handleMouseClick = () => {
                 window.pywebview.api.record_mouse_activity();
             };
-            
+
             // Add event listeners
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('click', handleMouseClick);
-            
+
             // Initial activity recording
             window.pywebview.api.record_mouse_activity();
-            
+
             // Return cleanup function
             return () => {
                 clearInterval(interval);
@@ -260,21 +271,18 @@ function AppContent() {
     const displayTime = formatTime(time);
     const dailyStatsTime = formatStatsTime(dailyStats.totalHours || 0);
     const weeklyStatsTime = formatStatsTime(weeklyStats.totalHours || 0);
-    
+
     // Format last updated time
     const formatLastUpdated = (date) => {
         if (!date) return 'Never';
-        
+
         const hours = date.getHours();
         const minutes = date.getMinutes();
         const ampm = hours >= 12 ? 'PM' : 'AM';
         const formattedHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
-        
+
         return `${formattedHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
     };
-
-
-
 
     // Fetch Employee Details
     const { data: employee = {}, isLoading, refetch } = useQuery({
@@ -297,82 +305,6 @@ function AppContent() {
     // Company id
     console.log(employee?.companyId?._id);
 
-
-
-    // send session
-    // API - POST - PATCH - https://tracker-beta-kohl.vercel.app/api/v1/sessions/ - With Bearer Token
-    // Body -
-    // {
-    //     "employeeId": "687c77e6873a193e1f6cff43",
-    //     "companyId": "6852cf7cb225521271b2452d",
-    //     "startTime": "2025-06-29T08:00:00.000Z",     // UTC
-    //     "endTime": "2025-06-29T10:00:00.000Z",       // UTC
-    //     "activeTime": 90,  // Second
-    //     "idleTime": 30,   // Second
-    //     "keyboardActivityRate": 100,   // Second
-    //     "mouseActivityRate": 1200,    // Second
-    //     "notes": "Session from RI Tracker APP v1."
-    // }
-    // Response -
-    // {
-    //     "success": true,
-    //     "message": "Session created successfully",
-    //     "data": {
-    //     "employeeId": "687c77e6873a193e1f6cff43",
-    //         "companyId": "6852cf7cb225521271b2452d",
-    //         "startTime": "2025-06-29T08:00:00.000Z",
-    //         "endTime": "2025-06-29T10:00:00.000Z",
-    //         "activeTime": 90,
-    //         "idleTime": 30,
-    //         "notes": "Session from Postman.",
-    //         "timezone": "UTC",
-    //         "isDeleted": false,
-    //         "mouseActivityRate": 1200,
-    //         "keyboardActivityRate": 100,
-    //         "_id": "687eab67026f5aab54d69cd2",
-    //         "createdAt": "2025-07-21T21:04:39.235Z",
-    //         "updatedAt": "2025-07-21T21:04:39.235Z",
-    //         "__v": 0
-    // }
-    // }
-
-
-    // Get Daily Stats of Employee
-    // API - GET - https://tracker-beta-kohl.vercel.app/api/v1/stats/daily/{employee id} - With Bearer Token
-    // Response -
-    // {
-    //     "success": true,
-    //     "message": "Daily stats retrieved successfully",
-    //     "data": {
-    //     "date": "2025-07-22",
-    //         "totalHours": 158,  // Second
-    //         "activeHours": 135,  // Second
-    //         "idleHours": 23,   // Second
-    //         "activePercentage": 85,
-    //         "sessionCount": 1
-    // }
-    // }
-
-    // Get Weekly Stats of Employee
-    // API - GET - https://tracker-beta-kohl.vercel.app/api/v1/stats/weekly/{employee id} - With Bearer Token
-    // Response -
-    // {
-    //     "success": true,
-    //     "message": "Weekly stats retrieved successfully",
-    //     "data": {
-    //     "weekStart": "2025-07-20T00:00:00.000Z",
-    //         "weekEnd": "2025-07-26T23:59:59.999Z",
-    //         "totalHours": 9056,  // Second
-    //         "activeHours": 7953,  // Second
-    //         "idleHours": 1103,   // Second
-    //         "activePercentage": 88,
-    //         "averageSessionsPerDay": 3
-    // }
-    // }
-
-
-
-
     // Function to handle returning from profile page
     const handleCloseProfile = () => {
         setShowProfilePage(false);
@@ -385,6 +317,9 @@ function AppContent() {
 
     return (
         <div className="min-h-screen flex items-center justify-center font-sans">
+            {/* Add the CSS styles */}
+            <style>{rotationStyles}</style>
+
             <div className="w-full max-w-sm bg-gray-50 rounded-lg overflow-hidden">
 
                 <main className="p-6 space-y-6">
@@ -404,7 +339,7 @@ function AppContent() {
                                 {showProjectDropdown && (
                                     <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
                                         {projects.map((project, index) => (
-                                            <button 
+                                            <button
                                                 key={index}
                                                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                                 onClick={() => {
@@ -432,14 +367,14 @@ function AppContent() {
                                 onClick={async () => {
                                     try {
                                         setTimerError(null);
-                                        
+
                                         if (!isRunning) {
                                             // Start the timer
                                             const result = await window.pywebview.api.start_timer(selectedProject);
                                             if (result.success) {
                                                 setSessionInfo(result.data);
                                                 setIsRunning(true);
-                                                
+
                                                 // Update stats if available
                                                 if (result.stats) {
                                                     if (result.stats.daily && result.stats.daily.success) {
@@ -461,7 +396,7 @@ function AppContent() {
                                                 setSessionInfo(null);
                                                 setIsRunning(false);
                                                 setTime(0); // Reset timer to 0
-                                                
+
                                                 // Update stats if available
                                                 if (result.stats) {
                                                     if (result.stats.daily && result.stats.daily.success) {
@@ -527,7 +462,7 @@ function AppContent() {
                 {/* Footer */}
                 <footer className="bg-white p-3 flex justify-between items-center text-sm text-gray-500 border-t border-gray-200 relative">
                     <div className="relative dropdown-container">
-                        <button 
+                        <button
                             className="p-2 rounded-md hover:bg-gray-100"
                             onClick={() => setShowDropdown(!showDropdown)}
                         >
@@ -535,7 +470,7 @@ function AppContent() {
                         </button>
                         {showDropdown && (
                             <div className="absolute bottom-full left-0 mb-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-                                <button 
+                                <button
                                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                     onClick={() => {
                                         setShowProfilePage(true);
@@ -544,7 +479,7 @@ function AppContent() {
                                 >
                                     View Profile
                                 </button>
-                                <button 
+                                <button
                                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
                                     onClick={() => {
                                         logout();
@@ -567,27 +502,27 @@ function AppContent() {
                                 // Get updated stats
                                 const dailyResult = await window.pywebview.api.get_daily_stats();
                                 const weeklyResult = await window.pywebview.api.get_weekly_stats();
-                                
+
                                 if (dailyResult.success) {
                                     setDailyStats(dailyResult.data);
                                 }
-                                
+
                                 if (weeklyResult.success) {
                                     setWeeklyStats(weeklyResult.data);
                                 }
-                                
+
                                 setStatsLastUpdated(new Date());
                             } catch (error) {
                                 console.error("Stats sync error:", error);
                             } finally {
-                                // Stop rotation animation after a delay to complete the animation
+                                // Stop rotation animation after a delay
                                 setTimeout(() => {
                                     setIsRotating(false);
                                 }, 1000); // 1 second to match the animation duration
                             }
                         }}
                     >
-                        <IconRefreshCw  className={`h-4 w-4 ${isRotating ? 'animate-spin-fast' : ''}`} />
+                        <IconRefreshCw className={`h-4 w-4 ${isRotating ? 'rotate-sync' : ''}`} />
                         <span>Sync</span>
                     </button>
                 </footer>
@@ -612,7 +547,7 @@ export default function App() {
 // Component that handles conditional rendering based on authentication status
 function AuthenticatedApp() {
     const { isAuthenticated, loading } = useAuth();
-    
+
     // Show loading indicator while checking authentication status
     if (loading) {
         return (
@@ -621,7 +556,7 @@ function AuthenticatedApp() {
             </div>
         );
     }
-    
+
     // Show Login page if not authenticated, otherwise show the app content
     return isAuthenticated() ? <AppContent /> : <Login />;
 }
