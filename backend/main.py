@@ -62,6 +62,10 @@ class Api:
         self.activity_check_interval = 1  # seconds between activity checks
         self.last_active_check_time = None
         
+        # Stats update variables
+        self.stats_timer = None
+        self.stats_update_interval = 600  # 10 minutes in seconds
+        
         # Throttling variables to prevent excessive event counting
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
@@ -291,6 +295,41 @@ class Api:
             print(f"Update session error: {e}")
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
+    def start_stats_updates(self):
+        """Start periodic stats updates"""
+        if self.stats_timer:
+            return
+            
+        def update_stats():
+            if not self.start_time:
+                return
+                
+            # Get updated stats
+            self.get_daily_stats()
+            self.get_weekly_stats()
+            
+            # Schedule the next update if timer is still running
+            if self.start_time:
+                self.stats_timer = threading.Timer(self.stats_update_interval, update_stats)
+                self.stats_timer.daemon = True
+                self.stats_timer.start()
+        
+        # Start the stats update timer
+        self.stats_timer = threading.Timer(self.stats_update_interval, update_stats)
+        self.stats_timer.daemon = True
+        self.stats_timer.start()
+        
+        # Get initial stats
+        daily_stats = self.get_daily_stats()
+        weekly_stats = self.get_weekly_stats()
+        return {"daily": daily_stats, "weekly": weekly_stats}
+    
+    def stop_stats_updates(self):
+        """Stop periodic stats updates"""
+        if self.stats_timer:
+            self.stats_timer.cancel()
+            self.stats_timer = None
+    
     def start_timer(self, project_name):
         """Start the timer and create a new session"""
         current_time = time.time()
@@ -313,8 +352,16 @@ class Api:
         # Start activity tracking
         self.start_activity_tracking()
         
+        # Start stats updates
+        stats = self.start_stats_updates()
+        
         # Create a new session
         result = self.create_session()
+        
+        # Add stats to the result
+        if result.get("success"):
+            result["stats"] = stats
+            
         return result
 
     def stop_timer(self):
@@ -370,6 +417,20 @@ class Api:
                 keyboard_rate=self.keyboard_activity_rate,
                 mouse_rate=self.mouse_activity_rate
             )
+            
+            # Stop stats updates
+            self.stop_stats_updates()
+            
+            # Get final stats
+            daily_stats = self.get_daily_stats()
+            weekly_stats = self.get_weekly_stats()
+            
+            # Add stats to the result
+            if result.get("success"):
+                result["stats"] = {
+                    "daily": daily_stats,
+                    "weekly": weekly_stats
+                }
             
             # Reset timer state
             self.start_time = None
@@ -510,6 +571,62 @@ class Api:
             "is_idle": self.is_idle
         }
     
+    def get_daily_stats(self):
+        """Get daily stats for the current employee"""
+        if not self.auth_token:
+            return {"success": False, "message": "Not authenticated"}
+        
+        try:
+            # Get employee ID from stored user data
+            employee_id = self.user_data.get('employeeId')
+            if not employee_id:
+                return {"success": False, "message": "Employee ID not found"}
+                
+            response = requests.get(
+                f'{URLS["DAILY_STATS"]}/{employee_id}',
+                headers={
+                    "Authorization": f"Bearer {self.auth_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            data = response.json()
+            
+            if data.get('success'):
+                return {"success": True, "data": data['data']}
+            else:
+                return {"success": False, "message": data.get('message', 'Failed to get daily stats')}
+        except Exception as e:
+            print(f"Daily stats error: {e}")
+            return {"success": False, "message": f"An error occurred: {str(e)}"}
+    
+    def get_weekly_stats(self):
+        """Get weekly stats for the current employee"""
+        if not self.auth_token:
+            return {"success": False, "message": "Not authenticated"}
+        
+        try:
+            # Get employee ID from stored user data
+            employee_id = self.user_data.get('employeeId')
+            if not employee_id:
+                return {"success": False, "message": "Employee ID not found"}
+                
+            response = requests.get(
+                f'{URLS["WEEKLY_STATS"]}/{employee_id}',
+                headers={
+                    "Authorization": f"Bearer {self.auth_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+            data = response.json()
+            
+            if data.get('success'):
+                return {"success": True, "data": data['data']}
+            else:
+                return {"success": False, "message": data.get('message', 'Failed to get weekly stats')}
+        except Exception as e:
+            print(f"Weekly stats error: {e}")
+            return {"success": False, "message": f"An error occurred: {str(e)}"}
+    
     def get_time_entries(self):
         with sqlite3.connect(db_file) as conn:
             c = conn.cursor()
@@ -521,7 +638,7 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = False
+    DEBUG = True
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 

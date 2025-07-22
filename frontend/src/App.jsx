@@ -125,6 +125,8 @@ function AppContent() {
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     const [selectedProject, setSelectedProject] = useState('Loading...');
     const [showProfilePage, setShowProfilePage] = useState(false);
+    const [isRotating, setIsRotating] = useState(false);
+
     const { isAuthenticated, logout, currentUser } = useAuth();
     const axiosSecure = useAxiosSecure()
 
@@ -155,7 +157,46 @@ function AppContent() {
     const [isRunning, setIsRunning] = useState(false);
     const [sessionInfo, setSessionInfo] = useState(null);
     const [timerError, setTimerError] = useState(null);
+    
+    // State for stats
+    const [dailyStats, setDailyStats] = useState({
+        totalHours: 0,
+        activeHours: 0,
+        activePercentage: 0
+    });
+    const [weeklyStats, setWeeklyStats] = useState({
+        totalHours: 0,
+        activeHours: 0,
+        activePercentage: 0
+    });
+    const [statsLastUpdated, setStatsLastUpdated] = useState(null);
 
+    // Effect to fetch stats when the app is opened
+    useEffect(() => {
+        const fetchInitialStats = async () => {
+            try {
+                // Get updated stats
+                const dailyResult = await window.pywebview.api.get_daily_stats();
+                const weeklyResult = await window.pywebview.api.get_weekly_stats();
+                
+                if (dailyResult.success) {
+                    setDailyStats(dailyResult.data);
+                }
+                
+                if (weeklyResult.success) {
+                    setWeeklyStats(weeklyResult.data);
+                }
+                
+                setStatsLastUpdated(new Date());
+            } catch (error) {
+                console.error("Initial stats fetch error:", error);
+            }
+        };
+        
+        // Fetch stats when component mounts
+        fetchInitialStats();
+    }, []);
+    
     // Effect to handle the timer logic
     useEffect(() => {
         let interval = null;
@@ -206,7 +247,31 @@ function AppContent() {
         return { h, m, s };
     };
 
+    // Format stats time from seconds to hours and minutes
+    const formatStatsTime = (seconds) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return {
+            hours: String(hours).padStart(2, '0'),
+            minutes: String(minutes).padStart(2, '0')
+        };
+    };
+
     const displayTime = formatTime(time);
+    const dailyStatsTime = formatStatsTime(dailyStats.totalHours || 0);
+    const weeklyStatsTime = formatStatsTime(weeklyStats.totalHours || 0);
+    
+    // Format last updated time
+    const formatLastUpdated = (date) => {
+        if (!date) return 'Never';
+        
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const formattedHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+        
+        return `${formattedHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+    };
 
 
 
@@ -374,6 +439,17 @@ function AppContent() {
                                             if (result.success) {
                                                 setSessionInfo(result.data);
                                                 setIsRunning(true);
+                                                
+                                                // Update stats if available
+                                                if (result.stats) {
+                                                    if (result.stats.daily && result.stats.daily.success) {
+                                                        setDailyStats(result.stats.daily.data);
+                                                    }
+                                                    if (result.stats.weekly && result.stats.weekly.success) {
+                                                        setWeeklyStats(result.stats.weekly.data);
+                                                    }
+                                                    setStatsLastUpdated(new Date());
+                                                }
                                             } else {
                                                 setTimerError(result.message || "Failed to start timer");
                                                 console.error("Timer start error:", result.message);
@@ -385,6 +461,17 @@ function AppContent() {
                                                 setSessionInfo(null);
                                                 setIsRunning(false);
                                                 setTime(0); // Reset timer to 0
+                                                
+                                                // Update stats if available
+                                                if (result.stats) {
+                                                    if (result.stats.daily && result.stats.daily.success) {
+                                                        setDailyStats(result.stats.daily.data);
+                                                    }
+                                                    if (result.stats.weekly && result.stats.weekly.success) {
+                                                        setWeeklyStats(result.stats.weekly.data);
+                                                    }
+                                                    setStatsLastUpdated(new Date());
+                                                }
                                             } else {
                                                 setTimerError(result.message || "Failed to stop timer");
                                                 console.error("Timer stop error:", result.message);
@@ -416,9 +503,11 @@ function AppContent() {
                         <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
                             <div>
                                 <p className="text-gray-500">Today</p>
-                                <p className="text-2xl font-bold text-gray-800">00<span className="text-lg">h</span> 32<span className="text-lg">m</span></p>
+                                <p className="text-2xl font-bold text-gray-800">
+                                    {dailyStatsTime.hours}<span className="text-lg">h</span> {dailyStatsTime.minutes}<span className="text-lg">m</span>
+                                </p>
                             </div>
-                            <CircularProgress percentage={85.4} />
+                            <CircularProgress percentage={dailyStats.activePercentage || 0} />
                         </div>
                         <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
                             <div>
@@ -426,9 +515,11 @@ function AppContent() {
                                     This Week
                                     <IconInfo className="text-gray-400 h-4 w-4" />
                                 </p>
-                                <p className="text-2xl font-bold text-gray-800">00<span className="text-lg">h</span> 32<span className="text-lg">m</span></p>
+                                <p className="text-2xl font-bold text-gray-800">
+                                    {weeklyStatsTime.hours}<span className="text-lg">h</span> {weeklyStatsTime.minutes}<span className="text-lg">m</span>
+                                </p>
                             </div>
-                            <CircularProgress percentage={91} />
+                            <CircularProgress percentage={weeklyStats.activePercentage || 0} />
                         </div>
                     </div>
                 </main>
@@ -465,9 +556,38 @@ function AppContent() {
                             </div>
                         )}
                     </div>
-                    <span>Last updated at 03:00 AM</span>
-                    <button className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-100">
-                        <IconRefreshCw className="h-4 w-4" />
+                    <span>Last updated at {formatLastUpdated(statsLastUpdated)}</span>
+                    <button
+                        className={`flex items-center gap-2 p-2 rounded-md hover:bg-gray-100 ${isRotating ? 'pointer-events-none' : ''}`}
+                        onClick={async () => {
+                            try {
+                                // Start rotation animation
+                                setIsRotating(true);
+
+                                // Get updated stats
+                                const dailyResult = await window.pywebview.api.get_daily_stats();
+                                const weeklyResult = await window.pywebview.api.get_weekly_stats();
+                                
+                                if (dailyResult.success) {
+                                    setDailyStats(dailyResult.data);
+                                }
+                                
+                                if (weeklyResult.success) {
+                                    setWeeklyStats(weeklyResult.data);
+                                }
+                                
+                                setStatsLastUpdated(new Date());
+                            } catch (error) {
+                                console.error("Stats sync error:", error);
+                            } finally {
+                                // Stop rotation animation after a delay to complete the animation
+                                setTimeout(() => {
+                                    setIsRotating(false);
+                                }, 1000); // 1 second to match the animation duration
+                            }
+                        }}
+                    >
+                        <IconRefreshCw  className={`h-4 w-4 ${isRotating ? 'animate-spin-fast' : ''}`} />
                         <span>Sync</span>
                     </button>
                 </footer>

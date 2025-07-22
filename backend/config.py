@@ -2,10 +2,22 @@
 
 APP_ENV = "development"  # or "production"
 
+# URLS = {
+#     "LOGIN": "https://remotintegrity-auth.vercel.app/api/v1/auth/login/employee",
+#     "PROFILE": "https://crm-amber-six.vercel.app/api/v1/employee",
+#     "SESSIONS": "https://tracker-beta-kohl.vercel.app/api/v1/sessions",
+#     "DAILY_STATS": "https://tracker-beta-kohl.vercel.app/api/v1/stats/daily",
+#     "WEEKLY_STATS": "https://tracker-beta-kohl.vercel.app/api/v1/stats/weekly",
+#     "FRONTEND_DEV": "http://localhost:5173",
+#     "FRONTEND_PROD": "dist/index.html"
+# }
+
 URLS = {
     "LOGIN": "https://remotintegrity-auth.vercel.app/api/v1/auth/login/employee",
     "PROFILE": "https://crm-amber-six.vercel.app/api/v1/employee",
-    "SESSIONS": "https://tracker-beta-kohl.vercel.app/api/v1/sessions",
+    "SESSIONS": "http://localhost:3010/api/v1/sessions",
+    "DAILY_STATS": "http://localhost:3010/api/v1/stats/daily",
+    "WEEKLY_STATS": "http://localhost:3010/api/v1/stats/weekly",
     "FRONTEND_DEV": "http://localhost:5173",
     "FRONTEND_PROD": "dist/index.html"
 }
