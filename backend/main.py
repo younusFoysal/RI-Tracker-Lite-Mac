@@ -6,6 +6,7 @@ import sys
 import requests
 import json
 from datetime import datetime, timezone
+from config import URLS, APP_ENV
 
 
 
@@ -18,6 +19,10 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Save db in local app data
 db_file = os.path.join(DATA_DIR, 'tracker.db')
 #db_file = 'tracker.db'
+
+LOGIN_URL = URLS["LOGIN"]
+PROFILE_URL = URLS["PROFILE"]
+SESSIONS_URL = URLS["SESSIONS"]
 
 def init_db():
     with sqlite3.connect(db_file) as conn:
@@ -96,11 +101,11 @@ class Api:
             print(f"Error clearing auth data: {e}")
             return False
 
-    def login(self, email, password, remember_me=False):
+    def login(self, email, password, remember_me=True):
         """Login to the remote API and store the token if remember_me is True"""
         try:
             response = requests.post(
-                'https://remotintegrity-auth.vercel.app/api/v1/auth/login/employee',
+                LOGIN_URL,
                 json={"email": email, "password": password},
                 headers={"Content-Type": "application/json"}
             )
@@ -138,7 +143,7 @@ class Api:
                 return {"success": False, "message": "Employee ID not found"}
                 
             response = requests.get(
-                f'https://crm-amber-six.vercel.app/api/v1/employee/{employee_id}',
+                f'{PROFILE_URL}/{employee_id}',
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
@@ -223,7 +228,7 @@ class Api:
             
             # Send request to create session
             response = requests.post(
-                'https://tracker-beta-kohl.vercel.app/api/v1/sessions/',
+                SESSIONS_URL,
                 json=session_data,
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
@@ -265,7 +270,7 @@ class Api:
             
             # Send request to update session
             response = requests.patch(
-                f'https://tracker-beta-kohl.vercel.app/api/v1/sessions/{self.session_id}',
+                f'{SESSIONS_URL}/{self.session_id}',
                 json=update_data,
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
@@ -332,7 +337,7 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = True
+    DEBUG = False
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 
