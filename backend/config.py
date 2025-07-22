@@ -9,3 +9,11 @@ URLS = {
     "FRONTEND_DEV": "http://localhost:5173",
     "FRONTEND_PROD": "dist/index.html"
 }
+
+# URLS = {
+#     "LOGIN": "https://auth.remoteintegrity.com/api/v1/auth/login/employee",
+#     "PROFILE": "https://crm.remoteintegrity.com/api/v1/employee",
+#     "SESSIONS": "https://tracker.remoteintegrity.com/api/v1/sessions",
+#     "FRONTEND_DEV": "http://localhost:5173",
+#     "FRONTEND_PROD": "dist/index.html"
+# }

@@ -5,6 +5,7 @@ import time
 import sys
 import requests
 import json
+import threading
 from datetime import datetime, timezone
 from config import URLS, APP_ENV
 
@@ -50,6 +51,22 @@ class Api:
         self.idle_time = 0
         self.keyboard_activity_rate = 0
         self.mouse_activity_rate = 0
+        
+        # Activity tracking variables
+        self.last_activity_time = None
+        self.is_idle = False
+        self.idle_threshold = 60  # seconds of inactivity before considered idle
+        self.keyboard_events = 0
+        self.mouse_events = 0
+        self.activity_timer = None
+        self.activity_check_interval = 1  # seconds between activity checks
+        self.last_active_check_time = None
+        
+        # Throttling variables to prevent excessive event counting
+        self.last_keyboard_event_time = 0
+        self.last_mouse_event_time = 0
+        self.event_throttle_interval = 0.5  # seconds between counting events
+        
         self.load_auth_data()
 
     def load_auth_data(self):
@@ -204,16 +221,7 @@ class Api:
                 return {"success": False, "message": "Employee ID or Company ID not found"}
             
             # Create session data
-            #start_time = datetime.utcnow().isoformat() + 'Z'  # UTC time in ISO format
-            #start_time = datetime.now(timezone.utc).isoformat()
             start_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-
-            #start_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-
-            # Optional: Ensure it ends with 'Z' if you want ISO 8601 compatibility
-            # if not start_time.endswith('Z'):
-            #     start_time = start_time.replace('+00:00', 'Z')
-
 
             session_data = {
                 "employeeId": employee_id,
@@ -251,10 +259,7 @@ class Api:
         
         try:
             # Create session update data
-            #end_time = datetime.utcnow().isoformat() + 'Z'  # UTC time in ISO format
-            #end_time = datetime.now(timezone.utc).isoformat()
             end_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
-            #end_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
             update_data = {
                 "endTime": end_time,
@@ -288,10 +293,25 @@ class Api:
     
     def start_timer(self, project_name):
         """Start the timer and create a new session"""
-        self.start_time = time.time()
+        current_time = time.time()
+        self.start_time = current_time
         self.current_project = project_name
+        
+        # Reset all activity tracking variables
         self.active_time = 0
         self.idle_time = 0
+        self.keyboard_events = 0
+        self.mouse_events = 0
+        self.keyboard_activity_rate = 0
+        self.mouse_activity_rate = 0
+        self.is_idle = False
+        self.last_activity_time = current_time
+        self.last_active_check_time = current_time
+        self.last_keyboard_event_time = 0
+        self.last_mouse_event_time = 0
+        
+        # Start activity tracking
+        self.start_activity_tracking()
         
         # Create a new session
         result = self.create_session()
@@ -300,9 +320,40 @@ class Api:
     def stop_timer(self):
         """Stop the timer and update the session"""
         if self.start_time:
-            # Calculate duration
-            duration = int(time.time() - self.start_time)
-            self.active_time = duration
+            current_time = time.time()
+            
+            # Perform final activity check
+            # Instead of using check_idle_status which would add more time,
+            # we'll manually handle the final time calculation
+            if self.last_active_check_time is not None:
+                if self.is_idle:
+                    # Add final idle time
+                    final_idle_time = current_time - self.last_active_check_time
+                    self.idle_time += final_idle_time
+                else:
+                    # Add final active time
+                    final_active_time = current_time - self.last_active_check_time
+                    self.active_time += final_active_time
+            
+            # Update activity metrics
+            self.update_activity_metrics()
+            
+            # Stop activity tracking
+            self.stop_activity_tracking()
+            
+            # Calculate total duration
+            duration = int(current_time - self.start_time)
+            
+            # Ensure active_time + idle_time = duration (approximately)
+            # This handles any potential rounding errors or missed time
+            total_tracked = self.active_time + self.idle_time
+            if abs(total_tracked - duration) > 1:  # Allow 1 second difference for rounding
+                # If there's a significant difference, adjust active_time
+                self.active_time = max(0, duration - self.idle_time)
+            
+            # Convert to integers for API
+            self.active_time = int(self.active_time)
+            self.idle_time = int(self.idle_time)
             
             # Store in local database
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -312,8 +363,13 @@ class Api:
                     (self.current_project, timestamp, duration)
                 )
             
-            # Update the session
-            result = self.update_session(active_time=duration)
+            # Update the session with all metrics
+            result = self.update_session(
+                active_time=self.active_time,
+                idle_time=self.idle_time,
+                keyboard_rate=self.keyboard_activity_rate,
+                mouse_rate=self.mouse_activity_rate
+            )
             
             # Reset timer state
             self.start_time = None
@@ -323,6 +379,137 @@ class Api:
         
         return {"success": False, "message": "Timer not running"}
 
+    def record_activity(self, activity_type='mouse'):
+        """Record user activity (keyboard or mouse)"""
+        current_time = time.time()
+        self.last_activity_time = current_time
+        
+        # If user was idle, add the idle time
+        if self.is_idle and self.last_active_check_time is not None:
+            idle_duration = current_time - self.last_active_check_time
+            self.idle_time += idle_duration
+            self.is_idle = False
+        
+        # Update activity counters with throttling
+        if activity_type == 'keyboard':
+            # Only count keyboard events if enough time has passed since the last one
+            if current_time - self.last_keyboard_event_time >= self.event_throttle_interval:
+                self.keyboard_events += 1
+                self.last_keyboard_event_time = current_time
+        else:  # mouse
+            # Only count mouse events if enough time has passed since the last one
+            if current_time - self.last_mouse_event_time >= self.event_throttle_interval:
+                self.mouse_events += 1
+                self.last_mouse_event_time = current_time
+    
+    def check_idle_status(self):
+        """Check if user is idle based on last activity time"""
+        if not self.start_time or not self.last_activity_time:
+            return
+            
+        current_time = time.time()
+        time_since_last_activity = current_time - self.last_activity_time
+        
+        # If previously active but now idle
+        if not self.is_idle and time_since_last_activity >= self.idle_threshold:
+            # Transition from active to idle
+            self.is_idle = True
+            
+            # Add time from last check to now as active time
+            if self.last_active_check_time is not None:
+                active_duration = current_time - self.last_active_check_time
+                self.active_time += active_duration
+            
+            self.last_active_check_time = current_time
+        
+        # If previously idle but still idle, update idle time
+        elif self.is_idle and self.last_active_check_time is not None:
+            idle_duration = current_time - self.last_active_check_time
+            self.idle_time += idle_duration
+            self.last_active_check_time = current_time
+            
+        # If active and still active, update active time
+        elif not self.is_idle and self.last_active_check_time is not None:
+            active_duration = current_time - self.last_active_check_time
+            self.active_time += active_duration
+            self.last_active_check_time = current_time
+    
+    def update_activity_metrics(self):
+        """Update activity metrics based on current state"""
+        if not self.start_time:
+            return
+            
+        current_time = time.time()
+        elapsed = current_time - self.start_time
+        
+        # Calculate activity rates (events per minute)
+        if elapsed > 0:
+            minutes = elapsed / 60
+            self.keyboard_activity_rate = int(self.keyboard_events / minutes) if minutes > 0 else 0
+            self.mouse_activity_rate = int(self.mouse_events / minutes) if minutes > 0 else 0
+    
+    def start_activity_tracking(self):
+        """Start the activity tracking thread"""
+        if self.activity_timer:
+            return
+            
+        def activity_check():
+            if not self.start_time:
+                return
+                
+            self.check_idle_status()
+            self.update_activity_metrics()
+            
+            # Schedule the next check if timer is still running
+            if self.start_time:
+                self.activity_timer = threading.Timer(self.activity_check_interval, activity_check)
+                self.activity_timer.daemon = True
+                self.activity_timer.start()
+        
+        # Initialize activity tracking
+        self.last_activity_time = time.time()
+        self.last_active_check_time = self.last_activity_time
+        self.is_idle = False
+        
+        # Start the activity check timer
+        self.activity_timer = threading.Timer(self.activity_check_interval, activity_check)
+        self.activity_timer.daemon = True
+        self.activity_timer.start()
+    
+    def stop_activity_tracking(self):
+        """Stop the activity tracking thread"""
+        if self.activity_timer:
+            self.activity_timer.cancel()
+            self.activity_timer = None
+    
+    def record_keyboard_activity(self):
+        """JavaScript interface method to record keyboard activity"""
+        if self.start_time:
+            self.record_activity('keyboard')
+            return {"success": True}
+        return {"success": False, "message": "Timer not running"}
+    
+    def record_mouse_activity(self):
+        """JavaScript interface method to record mouse activity"""
+        if self.start_time:
+            self.record_activity('mouse')
+            return {"success": True}
+        return {"success": False, "message": "Timer not running"}
+    
+    def get_activity_stats(self):
+        """Get current activity statistics"""
+        if not self.start_time:
+            return {"success": False, "message": "Timer not running"}
+            
+        return {
+            "success": True,
+            "active_time": self.active_time,
+            "idle_time": self.idle_time,
+            "keyboard_rate": self.keyboard_activity_rate,
+            "mouse_rate": self.mouse_activity_rate,
+            "is_idle": self.is_idle
+        }
+    
     def get_time_entries(self):
         with sqlite3.connect(db_file) as conn:
             c = conn.cursor()
@@ -334,7 +521,7 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = True
+    DEBUG = False
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 

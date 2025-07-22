@@ -163,6 +163,35 @@ function AppContent() {
             interval = setInterval(() => {
                 setTime(prevTime => prevTime + 1);
             }, 1000);
+            
+            // Add event listeners for activity tracking
+            const handleKeyDown = () => {
+                window.pywebview.api.record_keyboard_activity();
+            };
+            
+            const handleMouseMove = () => {
+                window.pywebview.api.record_mouse_activity();
+            };
+            
+            const handleMouseClick = () => {
+                window.pywebview.api.record_mouse_activity();
+            };
+            
+            // Add event listeners
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('click', handleMouseClick);
+            
+            // Initial activity recording
+            window.pywebview.api.record_mouse_activity();
+            
+            // Return cleanup function
+            return () => {
+                clearInterval(interval);
+                window.removeEventListener('keydown', handleKeyDown);
+                window.removeEventListener('mousemove', handleMouseMove);
+                window.removeEventListener('click', handleMouseClick);
+            };
         } else {
             clearInterval(interval);
         }
@@ -242,6 +271,39 @@ function AppContent() {
     // }
     // }
 
+
+    // Get Daily Stats of Employee
+    // API - GET - https://tracker-beta-kohl.vercel.app/api/v1/stats/daily/{employee id} - With Bearer Token
+    // Response -
+    // {
+    //     "success": true,
+    //     "message": "Daily stats retrieved successfully",
+    //     "data": {
+    //     "date": "2025-07-22",
+    //         "totalHours": 158,  // Second
+    //         "activeHours": 135,  // Second
+    //         "idleHours": 23,   // Second
+    //         "activePercentage": 85,
+    //         "sessionCount": 1
+    // }
+    // }
+
+    // Get Weekly Stats of Employee
+    // API - GET - https://tracker-beta-kohl.vercel.app/api/v1/stats/weekly/{employee id} - With Bearer Token
+    // Response -
+    // {
+    //     "success": true,
+    //     "message": "Weekly stats retrieved successfully",
+    //     "data": {
+    //     "weekStart": "2025-07-20T00:00:00.000Z",
+    //         "weekEnd": "2025-07-26T23:59:59.999Z",
+    //         "totalHours": 9056,  // Second
+    //         "activeHours": 7953,  // Second
+    //         "idleHours": 1103,   // Second
+    //         "activePercentage": 88,
+    //         "averageSessionsPerDay": 3
+    // }
+    // }
 
 
 
@@ -356,7 +418,7 @@ function AppContent() {
                                 <p className="text-gray-500">Today</p>
                                 <p className="text-2xl font-bold text-gray-800">00<span className="text-lg">h</span> 32<span className="text-lg">m</span></p>
                             </div>
-                            <CircularProgress percentage={10} />
+                            <CircularProgress percentage={85.4} />
                         </div>
                         <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
                             <div>
