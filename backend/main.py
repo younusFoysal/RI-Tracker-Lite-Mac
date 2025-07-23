@@ -719,8 +719,8 @@ if __name__ == '__main__':
 
     # Get the appropriate URL
     if DEBUG:
-        #url = "http://localhost:5173"
-        url = "dist/index.html"
+        url = "http://localhost:5173"
+        #url = "dist/index.html"
         debug = True
         print("Running in DEVELOPMENT mode with DevTools enabled")
     else:
@@ -734,7 +734,7 @@ if __name__ == '__main__':
         url,
         js_api=api,
         width=400,
-        height=670,
+        height=640,
         resizable=False
     )
 

@@ -6,57 +6,119 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
 import {QueryClient, QueryClientProvider, useMutation, useQuery} from "@tanstack/react-query";
 
-// Add this CSS at the top of your component file
-const rotationStyles = `
+// Compact CSS with modern animations and glassmorphism effects
+const compactStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  
   @keyframes rotateSync {
     from { transform: rotate(0deg); }
     to { transform: rotate(720deg); }
   }
   
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+  }
+  
+  @keyframes slideInUp {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  
   .rotate-sync {
     animation: rotateSync 1s linear;
   }
+  
+  .pulse-glow {
+    animation: pulseGlow 2s infinite;
+  }
+  
+  .slide-in-up {
+    animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .scale-in {
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .modern-shadow {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .hover-lift {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.15);
+  }
+  
+  .timer-glow {
+    position: relative;
+  }
+  
+  .timer-glow::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+    border-radius: inherit;
+    z-index: -1;
+    filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .timer-glow.active::before {
+    opacity: 0.6;
+  }
+  
+  * {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  .app-container {
+    width: 400px;
+    height: 600px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 `;
 
-// --- SVG Icon Components ---
-// These components replace the react-icons dependency to avoid build issues.
-
-const IconBuffer = ({ className }) => (
-    <svg viewBox="0 0 20 20" fill="currentColor" className={className}>
-        <path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V4z"></path>
-        <path d="M2 10a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2z"></path>
-    </svg>
-);
-
-const IconMinus = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-);
-
-const IconSquare = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-    </svg>
-);
-
-const IconX = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-);
-
+// Compact SVG Icon Components
 const IconChevronDown = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <polyline points="6 9 12 15 18 9"></polyline>
-    </svg>
-);
-
-const IconClipboard = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
     </svg>
 );
 
@@ -76,24 +138,32 @@ const IconRefreshCw = ({ className }) => (
     </svg>
 );
 
-const IconChevronsLeft = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <polyline points="11 17 6 12 11 7"></polyline>
-        <polyline points="18 17 13 12 18 7"></polyline>
-    </svg>
-);
+// Compact Circular Progress
+const CircularProgress = ({ percentage, size = "small" }) => {
+    const [animatedPercentage, setAnimatedPercentage] = useState(0);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setAnimatedPercentage(percentage);
+        }, 100);
+        return () => clearTimeout(timer);
+    }, [percentage]);
 
-// A component for the circular progress bar
-const CircularProgress = ({ percentage }) => {
-    const strokeWidth = 10;
-    const radius = 50;
+    const strokeWidth = size === "small" ? 4 : 6;
+    const radius = size === "small" ? 20 : 30;
     const normalizedRadius = radius - strokeWidth * 2;
     const circumference = normalizedRadius * 2 * Math.PI;
-    const strokeDashoffset = circumference - (percentage / 100) * circumference;
+    const strokeDashoffset = circumference - (animatedPercentage / 100) * circumference;
+
+    const getColor = (percentage) => {
+        if (percentage >= 80) return '#10b981';
+        if (percentage >= 60) return '#3b82f6';
+        if (percentage >= 40) return '#f59e0b';
+        return '#ef4444';
+    };
 
     return (
-        <div className="relative h-[100px] w-[100px]">
+        <div className={`relative ${size === "small" ? "h-[40px] w-[40px]" : "h-[80px] w-[80px]"} slide-in-up`}>
             <svg
                 height="100%"
                 width="100%"
@@ -101,7 +171,7 @@ const CircularProgress = ({ percentage }) => {
                 className="transform -rotate-90"
             >
                 <circle
-                    stroke="#e6e6e6"
+                    stroke="#f1f5f9"
                     fill="transparent"
                     strokeWidth={strokeWidth}
                     r={normalizedRadius}
@@ -109,39 +179,40 @@ const CircularProgress = ({ percentage }) => {
                     cy={radius}
                 />
                 <circle
-                    stroke="#002B91"
+                    stroke={getColor(percentage)}
                     fill="transparent"
                     strokeWidth={strokeWidth}
                     strokeDasharray={circumference + ' ' + circumference}
-                    style={{ strokeDashoffset }}
+                    style={{
+                        strokeDashoffset,
+                        transition: 'stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
                     strokeLinecap="round"
                     r={normalizedRadius}
                     cx={radius}
                     cy={radius}
                 />
             </svg>
-            <span className="absolute text-xl font-bold text-gray-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                {percentage}%
-            </span>
+            <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`${size === "small" ? "text-xs" : "text-sm"} font-bold text-gray-700`}>
+                    {percentage}%
+                </span>
+            </div>
         </div>
     );
 };
 
-
 const queryClient = new QueryClient()
 
-// Main App Component
+// Main App Component with compact design
 function AppContent() {
-    const [activeTab, setActiveTab] = useState('tracker');
     const [showDropdown, setShowDropdown] = useState(false);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     const [selectedProject, setSelectedProject] = useState('Loading...');
     const [showProfilePage, setShowProfilePage] = useState(false);
-    const [isRotating, setIsRotating] = useState(false); // Add this state
+    const [isRotating, setIsRotating] = useState(false);
     const { isAuthenticated, logout, currentUser } = useAuth();
     const axiosSecure = useAxiosSecure()
-
-    console.log(currentUser);
 
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
@@ -164,7 +235,7 @@ function AppContent() {
     }, [showDropdown, showProjectDropdown]);
 
     // State for the timer
-    const [time, setTime] = useState(0); // Initial time in seconds
+    const [time, setTime] = useState(0);
     const [isRunning, setIsRunning] = useState(false);
     const [sessionInfo, setSessionInfo] = useState(null);
     const [timerError, setTimerError] = useState(null);
@@ -186,7 +257,6 @@ function AppContent() {
     useEffect(() => {
         const fetchInitialStats = async () => {
             try {
-                // Get updated stats
                 const dailyResult = await window.pywebview.api.get_daily_stats();
                 const weeklyResult = await window.pywebview.api.get_weekly_stats();
 
@@ -204,7 +274,6 @@ function AppContent() {
             }
         };
 
-        // Fetch stats when component mounts
         fetchInitialStats();
     }, []);
 
@@ -216,7 +285,6 @@ function AppContent() {
                 setTime(prevTime => prevTime + 1);
             }, 1000);
 
-            // Add event listeners for activity tracking
             const handleKeyDown = () => {
                 window.pywebview.api.record_keyboard_activity();
             };
@@ -229,15 +297,12 @@ function AppContent() {
                 window.pywebview.api.record_mouse_activity();
             };
 
-            // Add event listeners
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('click', handleMouseClick);
 
-            // Initial activity recording
             window.pywebview.api.record_mouse_activity();
 
-            // Return cleanup function
             return () => {
                 clearInterval(interval);
                 window.removeEventListener('keydown', handleKeyDown);
@@ -279,7 +344,7 @@ function AppContent() {
         const hours = date.getHours();
         const minutes = date.getMinutes();
         const ampm = hours >= 12 ? 'PM' : 'AM';
-        const formattedHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+        const formattedHours = hours % 12 || 12;
 
         return `${formattedHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
     };
@@ -288,7 +353,6 @@ function AppContent() {
     const { data: employee = {}, isLoading, refetch } = useQuery({
         queryKey: ['employee'],
         queryFn: async () => {
-            // Use the getProfile method from AuthContext instead of direct API call
             const response = await window.pywebview.api.get_profile();
             if (response.success) {
                 setSelectedProject(response.data?.companyId?.name);
@@ -298,263 +362,315 @@ function AppContent() {
         }
     });
 
-    console.log(employee);
-    // employee id
-    console.log(currentUser?.employeeId);
-
-    // Company id
-    console.log(employee?.companyId?._id);
-
-    // Function to handle returning from profile page
     const handleCloseProfile = () => {
         setShowProfilePage(false);
     };
 
-    // If profile page is shown, render it
     if (showProfilePage) {
-        return <ProfilePage user={currentUser}  onClose={handleCloseProfile} />;
+        return <ProfilePage user={currentUser} onClose={handleCloseProfile} />;
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center font-sans">
-            {/* Add the CSS styles */}
-            <style>{rotationStyles}</style>
+        <div className="app-container gradient-bg">
+            <style>{compactStyles}</style>
 
-            <div className="w-full max-w-sm bg-gray-50 rounded-lg overflow-hidden">
+            <div className="h-full glass-card  overflow-hidden modern-shadow fade-in flex flex-col">
 
-                <main className="p-6 space-y-6">
-                    {/* Project Selection Section */}
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">What are you working on?</h2>
-                        <div className="space-y-3">
-                            <div className="relative project-dropdown-container">
+                {/* Compact Header */}
+                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 px-6 pt-4 pb-4 text-white flex-shrink-0">
+                {/*<div className="bg-blue-800 p-4 text-white flex-shrink-0">*/}
+                    <div className="flex items-center justify-between">
+                        <div className="slide-in-up">
+                            <h1 className="text-lg font-bold">RemoteIntegrity Tracker</h1>
+                            <p className="text-blue-100 text-xs opacity-90">Track your productivity</p>
+                        </div>
+                        <div className="relative dropdown-container slide-in-up">
+                            <button
+                                className="p-1.5 rounded-lg hover:bg-white/20 transition-all duration-200"
+                                onClick={() => setShowDropdown(!showDropdown)}
+                            >
+                                <BsThreeDotsVertical className="h-4 w-4" />
+                            </button>
+                            {showDropdown && (
+                                <div className="absolute top-full right-0 mt-2 w-40 glass-card rounded-lg shadow-xl py-1 z-20 scale-in">
+                                    <button
+                                        className="block w-full text-left px-3 py-2 text-sm  text-gray-700 hover:bg-indigo-50 transition-colors duration-200 flex items-center gap-2"
+                                        onClick={() => {
+                                            setShowProfilePage(true);
+                                            setShowDropdown(false);
+                                        }}
+                                    >
+                                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                        View Profile
+                                    </button>
+                                    <button
+                                        className="block w-full text-left px-3 py-2 text-sm  text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2"
+                                        onClick={() => {
+                                            logout();
+                                            setShowDropdown(false);
+                                        }}
+                                    >
+                                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                                        Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4 ">
+                    {/* Compact Project Selection */}
+                    <div className="slide-in-up">
+                        <div className="mb-3">
+                            <h2 className="text-sm font-semibold text-gray-800 mb-1">Working on</h2>
+                        </div>
+
+                        <div className="relative project-dropdown-container">
+                            <button
+                                disabled
+                                className="w-full glass-card rounded-xl py-3 px-4 transition-all duration-300 hover-lift border border-transparent hover:border-indigo-200"
+                                onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                            >
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                                        <span className="font-medium text-gray-800 text-sm truncate">{selectedProject}</span>
+                                    </div>
+                                    <IconChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Compact Timer Section */}
+                    <div className={`glass-card rounded-2xl p-4 timer-glow ${isRunning ? 'active pulse-glow' : ''} slide-in-up`}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                                <div className="flex items-end mb-1">
+                                    <span className={`text-3xl font-bold ${isRunning ? 'text-white' : "text-gray-800" }  tracking-tight font-mono`}>
+                                        {displayTime.h}:{displayTime.m}
+                                    </span>
+                                    <span className={`text-lg  ml-1 mb-0.5 font-mono ${isRunning ? 'text-gray-100' : "text-gray-400" }`}>
+                                        {displayTime.s}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-300 animate-pulse' : 'bg-gray-300'} transition-colors duration-300`}></div>
+                                    <span className={`text-xs ${isRunning ? 'text-white font-normal' : "text-gray-500 font-medium" } `}>
+                                        {isRunning ? 'Active Session' : 'Ready to Start'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="relative">
                                 <button
-                                    disabled
-                                    className="w-full flex justify-between items-center bg-white border border-gray-300 rounded-md py-3 px-4 leading-tight focus:outline-none focus:border-blue-800 focus:ring-1 focus:ring-blue-800"
-                                    onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+                                    onClick={async () => {
+                                        try {
+                                            setTimerError(null);
+
+                                            if (!isRunning) {
+                                                const result = await window.pywebview.api.start_timer(selectedProject);
+                                                if (result.success) {
+                                                    setSessionInfo(result.data);
+                                                    setIsRunning(true);
+
+                                                    if (result.stats) {
+                                                        if (result.stats.daily && result.stats.daily.success) {
+                                                            setDailyStats(result.stats.daily.data);
+                                                        }
+                                                        if (result.stats.weekly && result.stats.weekly.success) {
+                                                            setWeeklyStats(result.stats.weekly.data);
+                                                        }
+                                                        setStatsLastUpdated(new Date());
+                                                    }
+                                                } else {
+                                                    setTimerError(result.message || "Failed to start timer");
+                                                    console.error("Timer start error:", result.message);
+                                                }
+                                            } else {
+                                                const result = await window.pywebview.api.stop_timer();
+                                                if (result.success) {
+                                                    setSessionInfo(null);
+                                                    setIsRunning(false);
+                                                    setTime(0);
+
+                                                    if (result.stats) {
+                                                        if (result.stats.daily && result.stats.daily.success) {
+                                                            setDailyStats(result.stats.daily.data);
+                                                        }
+                                                        if (result.stats.weekly && result.stats.weekly.success) {
+                                                            setWeeklyStats(result.stats.weekly.data);
+                                                        }
+                                                        setStatsLastUpdated(new Date());
+                                                    }
+                                                } else {
+                                                    setTimerError(result.message || "Failed to stop timer");
+                                                    console.error("Timer stop error:", result.message);
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error("Timer operation error:", error);
+                                            setTimerError("An error occurred during timer operation");
+                                        }
+                                    }}
+                                    className={`group relative w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 transform hover:scale-105 ${
+                                        isRunning
+                                            ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'
+                                            : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700'
+                                    }`}
                                 >
-                                    <span>{selectedProject}</span>
-                                    <IconChevronDown className="h-5 w-5 text-gray-700" />
+                                    <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                    {isRunning ? (
+                                        <div className="bg-white w-5 h-5 rounded-lg shadow-sm"></div>
+                                    ) : (
+                                        <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[18px] border-l-white border-b-[12px] border-b-transparent ml-0.5 drop-shadow-sm"></div>
+                                    )}
                                 </button>
-                                {showProjectDropdown && (
-                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-                                        {projects.map((project, index) => (
-                                            <button
-                                                key={index}
-                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                onClick={() => {
-                                                    setSelectedProject(project);
-                                                    setShowProjectDropdown(false);
-                                                }}
-                                            >
-                                                {project}
-                                            </button>
-                                        ))}
+                                {timerError && (
+                                    <div className="absolute top-full right-0 mt-2">
+                                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-2 py-1 rounded-lg max-w-32">
+                                            {timerError}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Timer Section */}
-                    <div className="bg-white border-2 border-blue-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
-                        <div className="flex items-end">
-                            <span className="text-5xl font-bold text-gray-800 tracking-wider">{displayTime.h}:{displayTime.m}</span>
-                            <span className="text-2xl text-gray-500 ml-1 mb-1">{displayTime.s}</span>
+                    {/* Compact Stats Section */}
+                    <div className="space-y-3">
+                        {/* Today's Stats */}
+                        <div className="glass-card rounded-xl p-3 hover-lift slide-in-up">
+                            <div className="flex justify-between items-center">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <div className="w-0.5 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></div>
+                                        <h3 className="text-gray-600 font-medium text-sm">Today's Progress</h3>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-xl font-bold text-gray-800">
+                                            {dailyStatsTime.hours}
+                                            <span className="text-sm font-medium text-gray-500">h</span>
+                                            <span className="mx-0.5"></span>
+                                            {dailyStatsTime.minutes}
+                                            <span className="text-sm font-medium text-gray-500">m</span>
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {dailyStats.activePercentage || 0}% productive
+                                        </p>
+                                    </div>
+                                </div>
+                                <CircularProgress percentage={dailyStats.activePercentage || 0} size="big" />
+                            </div>
                         </div>
-                        <div className="relative">
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        setTimerError(null);
 
-                                        if (!isRunning) {
-                                            // Start the timer
-                                            const result = await window.pywebview.api.start_timer(selectedProject);
-                                            if (result.success) {
-                                                setSessionInfo(result.data);
-                                                setIsRunning(true);
+                        {/* Weekly Stats */}
+                        <div className="glass-card rounded-xl p-3 hover-lift slide-in-up">
+                            <div className="flex justify-between items-center">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <div className="w-0.5 h-4 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full"></div>
+                                        <h3 className="text-gray-600 font-medium text-sm flex items-center gap-1">
+                                            This Week
+                                            <IconInfo className="text-gray-400 h-3 w-3" />
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-xl font-bold text-gray-800">
+                                            {weeklyStatsTime.hours}
+                                            <span className="text-sm font-medium text-gray-500">h</span>
+                                            <span className="mx-0.5"></span>
+                                            {weeklyStatsTime.minutes}
+                                            <span className="text-sm font-medium text-gray-500">m</span>
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            {weeklyStats.activePercentage || 0}% productive
+                                        </p>
+                                    </div>
+                                </div>
+                                <CircularProgress percentage={weeklyStats.activePercentage || 0} size="big" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                                // Update stats if available
-                                                if (result.stats) {
-                                                    if (result.stats.daily && result.stats.daily.success) {
-                                                        setDailyStats(result.stats.daily.data);
-                                                    }
-                                                    if (result.stats.weekly && result.stats.weekly.success) {
-                                                        setWeeklyStats(result.stats.weekly.data);
-                                                    }
-                                                    setStatsLastUpdated(new Date());
-                                                }
-                                            } else {
-                                                setTimerError(result.message || "Failed to start timer");
-                                                console.error("Timer start error:", result.message);
+                {/* Compact Footer */}
+                <footer className="glass-card border-t border-white/20 py-3 px-6 fade-in flex-shrink-0">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                                <span>Synced</span>
+                            </div>
+                            <span className="font-medium text-gray-700">
+                                {formatLastUpdated(statsLastUpdated)}
+                            </span>
+                        </div>
+
+                        <button
+                            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all duration-300 ${
+                                isRotating ? 'pointer-events-none' : 'hover-lift'
+                            }`}
+                            onClick={async () => {
+                                try {
+                                    setIsRotating(true);
+
+                                    if (isRunning) {
+                                        const activityStats = await window.pywebview.api.get_activity_stats();
+
+                                        if (activityStats.success) {
+                                            const sessionUpdateResult = await window.pywebview.api.update_session(
+                                                activityStats.active_time,
+                                                activityStats.idle_time,
+                                                activityStats.keyboard_rate,
+                                                activityStats.mouse_rate,
+                                                false
+                                            );
+
+                                            if (!sessionUpdateResult.success) {
+                                                console.error("Session update error:", sessionUpdateResult.message);
+                                                return;
                                             }
                                         } else {
-                                            // Stop the timer
-                                            const result = await window.pywebview.api.stop_timer();
-                                            if (result.success) {
-                                                setSessionInfo(null);
-                                                setIsRunning(false);
-                                                setTime(0); // Reset timer to 0
-
-                                                // Update stats if available
-                                                if (result.stats) {
-                                                    if (result.stats.daily && result.stats.daily.success) {
-                                                        setDailyStats(result.stats.daily.data);
-                                                    }
-                                                    if (result.stats.weekly && result.stats.weekly.success) {
-                                                        setWeeklyStats(result.stats.weekly.data);
-                                                    }
-                                                    setStatsLastUpdated(new Date());
-                                                }
-                                            } else {
-                                                setTimerError(result.message || "Failed to stop timer");
-                                                console.error("Timer stop error:", result.message);
-                                            }
-                                        }
-                                    } catch (error) {
-                                        console.error("Timer operation error:", error);
-                                        setTimerError("An error occurred during timer operation");
-                                    }
-                                }}
-                                className={`w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-colors ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-[#002B91] hover:bg-blue-800'}`}
-                            >
-                                {isRunning ? (
-                                    <div className="bg-white w-6 h-6 rounded-md"></div>
-                                ) : (
-                                    <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-1"></div>
-                                )}
-                            </button>
-                            {timerError && (
-                                <div className="absolute top-full right-0 mt-2 text-xs text-red-500">
-                                    {timerError}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Stats Section */}
-                    <div className="space-y-4">
-                        <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
-                            <div>
-                                <p className="text-gray-500">Today</p>
-                                <p className="text-2xl font-bold text-gray-800">
-                                    {dailyStatsTime.hours}<span className="text-lg">h</span> {dailyStatsTime.minutes}<span className="text-lg">m</span>
-                                </p>
-                            </div>
-                            <CircularProgress percentage={dailyStats.activePercentage || 0} />
-                        </div>
-                        <div className="bg-white p-4 rounded-xl shadow-sm flex justify-between items-center">
-                            <div>
-                                <p className="text-gray-500 flex items-center gap-1">
-                                    This Week
-                                    <IconInfo className="text-gray-400 h-4 w-4" />
-                                </p>
-                                <p className="text-2xl font-bold text-gray-800">
-                                    {weeklyStatsTime.hours}<span className="text-lg">h</span> {weeklyStatsTime.minutes}<span className="text-lg">m</span>
-                                </p>
-                            </div>
-                            <CircularProgress percentage={weeklyStats.activePercentage || 0} />
-                        </div>
-                    </div>
-                </main>
-
-                {/* Footer */}
-                <footer className="bg-white p-3 flex justify-between items-center text-sm text-gray-500 border-t border-gray-200 relative">
-                    <div className="relative dropdown-container">
-                        <button
-                            className="p-2 rounded-md hover:bg-gray-100"
-                            onClick={() => setShowDropdown(!showDropdown)}
-                        >
-                            <BsThreeDotsVertical className="h-5 w-5" />
-                        </button>
-                        {showDropdown && (
-                            <div className="absolute bottom-full left-0 mb-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-                                <button
-                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    onClick={() => {
-                                        setShowProfilePage(true);
-                                        setShowDropdown(false);
-                                    }}
-                                >
-                                    View Profile
-                                </button>
-                                <button
-                                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                                    onClick={() => {
-                                        logout();
-                                        setShowDropdown(false);
-                                    }}
-                                >
-                                    Logout
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                    <span>Last updated at {formatLastUpdated(statsLastUpdated)}</span>
-                    <button
-                        className={`flex items-center gap-2 p-2 rounded-md hover:bg-gray-100 ${isRotating ? 'pointer-events-none' : ''}`}
-                        onClick={async () => {
-                            try {
-                                // Start rotation animation
-                                setIsRotating(true);
-
-                                // First update the session if timer is running
-                                if (isRunning) {
-                                    // Get current activity stats
-                                    const activityStats = await window.pywebview.api.get_activity_stats();
-                                    
-                                    if (activityStats.success) {
-                                        // Update the session with current metrics (not final update)
-                                        const sessionUpdateResult = await window.pywebview.api.update_session(
-                                            activityStats.active_time,
-                                            activityStats.idle_time,
-                                            activityStats.keyboard_rate,
-                                            activityStats.mouse_rate,
-                                            false // not a final update
-                                        );
-                                        
-                                        // Only proceed to get stats if session update was successful
-                                        if (!sessionUpdateResult.success) {
-                                            console.error("Session update error:", sessionUpdateResult.message);
+                                            console.error("Failed to get activity stats:", activityStats.message);
                                             return;
                                         }
-                                    } else {
-                                        console.error("Failed to get activity stats:", activityStats.message);
-                                        return;
                                     }
+
+                                    const dailyResult = await window.pywebview.api.get_daily_stats();
+                                    const weeklyResult = await window.pywebview.api.get_weekly_stats();
+
+                                    if (dailyResult.success) {
+                                        setDailyStats(dailyResult.data);
+                                    }
+
+                                    if (weeklyResult.success) {
+                                        setWeeklyStats(weeklyResult.data);
+                                    }
+
+                                    setStatsLastUpdated(new Date());
+                                } catch (error) {
+                                    console.error("Stats sync error:", error);
+                                } finally {
+                                    setTimeout(() => {
+                                        setIsRotating(false);
+                                    }, 1000);
                                 }
-
-                                // After session update is successful (or if timer is not running), get updated stats
-                                const dailyResult = await window.pywebview.api.get_daily_stats();
-                                const weeklyResult = await window.pywebview.api.get_weekly_stats();
-
-                                if (dailyResult.success) {
-                                    setDailyStats(dailyResult.data);
-                                }
-
-                                if (weeklyResult.success) {
-                                    setWeeklyStats(weeklyResult.data);
-                                }
-
-                                setStatsLastUpdated(new Date());
-                            } catch (error) {
-                                console.error("Stats sync error:", error);
-                            } finally {
-                                // Stop rotation animation after a delay
-                                setTimeout(() => {
-                                    setIsRotating(false);
-                                }, 1000); // 1 second to match the animation duration
-                            }
-                        }}
-                    >
-                        <IconRefreshCw className={`h-4 w-4 ${isRotating ? 'rotate-sync' : ''}`} />
-                        <span>Sync</span>
-                    </button>
+                            }}
+                        >
+                            <IconRefreshCw className={`h-3 w-3 text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200 ${
+                                isRotating ? 'rotate-sync' : ''
+                            }`} />
+                            <span className="text-xs font-medium text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200">
+                                Sync
+                            </span>
+                        </button>
+                    </div>
                 </footer>
-
+                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 p-1 text-white flex-shrink-0"></div>
             </div>
-
         </div>
     );
 }
@@ -574,11 +690,20 @@ export default function App() {
 function AuthenticatedApp() {
     const { isAuthenticated, loading } = useAuth();
 
-    // Show loading indicator while checking authentication status
+    // Enhanced loading screen
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p className="text-gray-600">Loading...</p>
+            <div className="app-container gradient-bg">
+                <div className="h-full glass-card rounded-2xl flex items-center justify-center modern-shadow">
+                    <div className="text-center">
+                        <div className="w-12 h-12 mx-auto mb-3 relative">
+                            <div className="absolute inset-0 rounded-full border-3 border-indigo-200"></div>
+                            <div className="absolute inset-0 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin"></div>
+                        </div>
+                        <h2 className="text-lg font-semibold text-gray-800 mb-1">TimeSync Pro</h2>
+                        <p className="text-gray-600 text-sm">Loading workspace...</p>
+                    </div>
+                </div>
             </div>
         );
     }
