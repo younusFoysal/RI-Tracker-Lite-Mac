@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-// Mock user avatar for demo
-const userAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%236366f1'/%3E%3Ctext x='32' y='40' text-anchor='middle' fill='white' font-family='Arial' font-size='24' font-weight='bold'%3EJD%3C/text%3E%3C/svg%3E";
+import userAvatar from '/userAvatar.png'
 
 // --- SVG Icon Components with enhanced styling ---
 const IconX = ({ className }) => (
@@ -219,7 +217,7 @@ export default function ProfilePage({ user, onClose }) {
                                         <p className="text-white/80 text-sm font-medium">{user.email}</p>
                                     </div>
                                 </div>
-                                <StatusIndicator />
+                                {/*<StatusIndicator />*/}
                             </div>
 
                             {/* Enhanced User Info Card */}

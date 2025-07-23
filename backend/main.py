@@ -7,7 +7,7 @@ import requests
 import json
 import threading
 from datetime import datetime, timezone
-from config import URLS, APP_ENV
+from config import URLS
 
 
 APP_NAME = "RI_Tracker"
@@ -713,14 +713,15 @@ if __name__ == '__main__':
     api = Api()
 
     # Determine if we're in development or production mode
-    DEBUG = True
+    #DEBUG = True
+    DEBUG = URLS["DEBUG"]
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 
     # Get the appropriate URL
     if DEBUG:
-        url = "http://localhost:5173"
-        #url = "dist/index.html"
+        #url = "http://localhost:5173"
+        url = "dist/index.html"
         debug = True
         print("Running in DEVELOPMENT mode with DevTools enabled")
     else:
@@ -734,7 +735,7 @@ if __name__ == '__main__':
         url,
         js_api=api,
         width=400,
-        height=640,
+        height=630,
         resizable=False
     )
 
