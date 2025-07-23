@@ -499,7 +499,33 @@ function AppContent() {
                                 // Start rotation animation
                                 setIsRotating(true);
 
-                                // Get updated stats
+                                // First update the session if timer is running
+                                if (isRunning) {
+                                    // Get current activity stats
+                                    const activityStats = await window.pywebview.api.get_activity_stats();
+                                    
+                                    if (activityStats.success) {
+                                        // Update the session with current metrics (not final update)
+                                        const sessionUpdateResult = await window.pywebview.api.update_session(
+                                            activityStats.active_time,
+                                            activityStats.idle_time,
+                                            activityStats.keyboard_rate,
+                                            activityStats.mouse_rate,
+                                            false // not a final update
+                                        );
+                                        
+                                        // Only proceed to get stats if session update was successful
+                                        if (!sessionUpdateResult.success) {
+                                            console.error("Session update error:", sessionUpdateResult.message);
+                                            return;
+                                        }
+                                    } else {
+                                        console.error("Failed to get activity stats:", activityStats.message);
+                                        return;
+                                    }
+                                }
+
+                                // After session update is successful (or if timer is not running), get updated stats
                                 const dailyResult = await window.pywebview.api.get_daily_stats();
                                 const weeklyResult = await window.pywebview.api.get_weekly_stats();
 
