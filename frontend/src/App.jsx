@@ -89,16 +89,17 @@ const compactStyles = `
     left: -1px;
     right: -1px;
     bottom: -1px;
-    background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+    // background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4, #10b981);
+    background: #002B91;
     border-radius: inherit;
     z-index: -1;
-    filter: blur(6px);
+    // filter: blur(6px);
     opacity: 0;
     transition: opacity 0.3s ease;
   }
   
   .timer-glow.active::before {
-    opacity: 0.6;
+    opacity: 0.9;
   }
   
   * {
@@ -194,7 +195,7 @@ const CircularProgress = ({ percentage, size = "small" }) => {
                 />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`${size === "small" ? "text-xs" : "text-sm"} font-bold text-gray-700`}>
+                <span className={`${size === "small" ? "text-xs" : "text-xs"} font-bold text-gray-700`}>
                     {percentage}%
                 </span>
             </div>
@@ -377,11 +378,11 @@ function AppContent() {
             <div className="h-full glass-card  overflow-hidden modern-shadow fade-in flex flex-col">
 
                 {/* Compact Header */}
-                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 px-6 pt-4 pb-4 text-white flex-shrink-0">
+                <div className="bg-[#002B91] px-6 pt-4 pb-4 text-white flex-shrink-0">
                 {/*<div className="bg-blue-800 p-4 text-white flex-shrink-0">*/}
                     <div className="flex items-center justify-between">
                         <div className="slide-in-up">
-                            <h1 className="text-lg font-bold">RemoteIntegrity Tracker</h1>
+                            <h1 className="text-lg font-semibold">RemoteIntegrity Tracker</h1>
                             <p className="text-blue-100 text-xs opacity-90">Track your productivity</p>
                         </div>
                         <div className="relative dropdown-container slide-in-up">
@@ -394,7 +395,7 @@ function AppContent() {
                             {showDropdown && (
                                 <div className="absolute top-full right-0 mt-2 w-40 glass-card rounded-lg shadow-xl py-1 z-20 scale-in">
                                     <button
-                                        className="block w-full text-left px-3 py-2 text-sm  text-gray-700 hover:bg-indigo-50 transition-colors duration-200 flex items-center gap-2"
+                                        className="block w-full text-left px-3 py-2 text-sm  text-gray-700 hover:bg-blue-50 transition-colors duration-200 flex items-center gap-2"
                                         onClick={() => {
                                             setShowProfilePage(true);
                                             setShowDropdown(false);
@@ -430,12 +431,12 @@ function AppContent() {
                         <div className="relative project-dropdown-container">
                             <button
                                 disabled
-                                className="w-full glass-card rounded-xl py-3 px-4 transition-all duration-300 hover-lift border border-transparent hover:border-indigo-200"
+                                className="w-full glass-card rounded-xl py-3 px-4 transition-all duration-300 hover-lift border border-transparent hover:border-blue-200"
                                 onClick={() => setShowProjectDropdown(!showProjectDropdown)}
                             >
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                                        <div className="w-2 h-2 bg-blue-800 rounded-full"></div>
                                         <span className="font-medium text-gray-800 text-sm truncate">{selectedProject}</span>
                                     </div>
                                     <IconChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -517,13 +518,13 @@ function AppContent() {
                                     }}
                                     className={`group relative w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 transform hover:scale-105 ${
                                         isRunning
-                                            ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'
-                                            : 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700'
+                                            ? 'bg-red-400/90 hover:bg-red-500'
+                                            : 'bg-blue-800 hover:bg-blue-700'
                                     }`}
                                 >
                                     <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                                     {isRunning ? (
-                                        <div className="bg-white w-5 h-5 rounded-lg shadow-sm"></div>
+                                        <div className="bg-white w-5 h-5 rounded-sm shadow-sm"></div>
                                     ) : (
                                         <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[18px] border-l-white border-b-[12px] border-b-transparent ml-0.5 drop-shadow-sm"></div>
                                     )}
@@ -546,7 +547,7 @@ function AppContent() {
                             <div className="flex justify-between items-center">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-1.5 mb-2">
-                                        <div className="w-0.5 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></div>
+                                        <div className="w-0.5 h-4 bg-blue-600 rounded-full"></div>
                                         <h3 className="text-gray-600 font-medium text-sm">Today's Progress</h3>
                                     </div>
                                     <div className="space-y-0.5">
@@ -571,7 +572,7 @@ function AppContent() {
                             <div className="flex justify-between items-center">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-1.5 mb-2">
-                                        <div className="w-0.5 h-4 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full"></div>
+                                        <div className="w-0.5 h-4 bg-blue-600 rounded-full"></div>
                                         <h3 className="text-gray-600 font-medium text-sm flex items-center gap-1">
                                             This Week
                                             <IconInfo className="text-gray-400 h-3 w-3" />
@@ -610,7 +611,7 @@ function AppContent() {
                         </div>
 
                         <button
-                            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all duration-300 ${
+                            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 transition-all duration-300 ${
                                 isRotating ? 'pointer-events-none' : 'hover-lift'
                             }`}
                             onClick={async () => {
@@ -660,16 +661,16 @@ function AppContent() {
                                 }
                             }}
                         >
-                            <IconRefreshCw className={`h-3 w-3 text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200 ${
+                            <IconRefreshCw className={`h-3 w-3 text-blue-800 group-hover:text-blue-800 transition-colors duration-200 ${
                                 isRotating ? 'rotate-sync' : ''
                             }`} />
-                            <span className="text-xs font-medium text-indigo-600 group-hover:text-indigo-700 transition-colors duration-200">
+                            <span className="text-xs font-medium text-blue-800 group-hover:text-blue-800 transition-colors duration-200">
                                 Sync
                             </span>
                         </button>
                     </div>
                 </footer>
-                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 p-1 text-white flex-shrink-0"></div>
+                <div className="bg-[#002B91] p-1 text-white flex-shrink-0"></div>
             </div>
         </div>
     );
@@ -697,8 +698,8 @@ function AuthenticatedApp() {
                 <div className="h-full glass-card rounded-2xl flex items-center justify-center modern-shadow">
                     <div className="text-center">
                         <div className="w-12 h-12 mx-auto mb-3 relative">
-                            <div className="absolute inset-0 rounded-full border-3 border-indigo-200"></div>
-                            <div className="absolute inset-0 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin"></div>
+                            <div className="absolute inset-0 rounded-full border-3 border-blue-200"></div>
+                            <div className="absolute inset-0 rounded-full border-3 border-blue-600 border-t-transparent animate-spin"></div>
                         </div>
                         <h2 className="text-lg font-semibold text-gray-800 mb-1">TimeSync Pro</h2>
                         <p className="text-gray-600 text-sm">Loading workspace...</p>

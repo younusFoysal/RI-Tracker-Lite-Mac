@@ -83,19 +83,19 @@ const MenuItem = ({ icon, text, isLast = false, delay = 0 }) => {
         >
             <a
                 href="#"
-                className="group flex items-center justify-between p-4 rounded-2xl bg-white/70 backdrop-blur-sm border border-white/20 hover:bg-white hover:shadow-lg hover:shadow-indigo-500/10 hover:border-indigo-200/50 text-slate-600 hover:text-slate-800 transition-all duration-300 hover:-translate-y-1"
+                className="group flex items-center justify-between p-4 rounded-2xl bg-white/70 backdrop-blur-sm border border-white/20 hover:bg-white hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-200/50 text-slate-600 hover:text-slate-800 transition-all duration-300 hover:-translate-y-1"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
             >
                 <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 group-hover:from-indigo-100 group-hover:to-blue-100 transition-all duration-300">
+                    <div className="p-2 rounded-xl bg-gradient-to-br from-blue-50 to-blue-50 group-hover:from-blue-100 group-hover:to-blue-100 transition-all duration-300">
                         {React.cloneElement(icon, {
-                            className: "h-5 w-5 text-indigo-600 group-hover:text-indigo-700 transition-colors duration-300"
+                            className: "h-5 w-5 text-blue-600 group-hover:text-blue-700 transition-colors duration-300"
                         })}
                     </div>
                     <span className="font-medium">{text}</span>
                 </div>
-                <IconArrowRight className={`h-4 w-4 text-slate-400 group-hover:text-indigo-600 transition-all duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
+                <IconArrowRight className={`h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-all duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
             </a>
         </div>
     );
@@ -140,7 +140,7 @@ export default function ProfilePage({ user, onClose }) {
     ];
 
     return (
-        <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center font-sans">
+        <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-blue-100 flex items-center justify-center font-sans">
             <style jsx>{`
                 @keyframes slideInDown {
                     from {
@@ -185,10 +185,10 @@ export default function ProfilePage({ user, onClose }) {
             `}</style>
 
             <div className={`w-full max-w-md transition-all overflow-hidden duration-700 ease-out ${mounted ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-                <div className="bg-white/80 backdrop-blur-xl  shadow-2xl shadow-indigo-500/10 overflow-hidden">
+                <div className="bg-white/80 backdrop-blur-xl  shadow-2xl shadow-blue-500/10 overflow-hidden">
 
                     {/* Header with gradient background */}
-                    <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 p-8 pb-6">
+                    <div className="relative bg-[#002B91] p-8 pb-6">
                         {/* Decorative elements */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
@@ -279,7 +279,7 @@ export default function ProfilePage({ user, onClose }) {
                             </button>
                         </div>
                     </div>
-                    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 p-1 mt-[13px] text-white flex-shrink-0 "></div>
+                    <div className="bg-[#002B91] p-1 mt-[13px] text-white flex-shrink-0 "></div>
                 </div>
             </div>
         </div>
