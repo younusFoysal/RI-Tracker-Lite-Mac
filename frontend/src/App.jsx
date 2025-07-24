@@ -240,6 +240,7 @@ function AppContent() {
     const [isRunning, setIsRunning] = useState(false);
     const [sessionInfo, setSessionInfo] = useState(null);
     const [timerError, setTimerError] = useState(null);
+    const [isTimerOperationPending, setIsTimerOperationPending] = useState(false);
 
     // State for stats
     const [dailyStats, setDailyStats] = useState({
@@ -460,16 +461,18 @@ function AppContent() {
                                 <div className="flex items-center gap-1.5">
                                     <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-300 animate-pulse' : 'bg-gray-300'} transition-colors duration-300`}></div>
                                     <span className={`text-xs ${isRunning ? 'text-white font-normal' : "text-gray-500 font-medium" } `}>
-                                        {isRunning ? 'Active Session' : 'Ready to Start'}
+                                        {isTimerOperationPending ? "Loading..." : isRunning ? 'Active Session' : 'Ready to Start'}
                                     </span>
                                 </div>
                             </div>
 
                             <div className="relative">
                                 <button
+                                    disabled={isTimerOperationPending}
                                     onClick={async () => {
                                         try {
                                             setTimerError(null);
+                                            setIsTimerOperationPending(true);
 
                                             if (!isRunning) {
                                                 const result = await window.pywebview.api.start_timer(selectedProject);
@@ -514,9 +517,15 @@ function AppContent() {
                                         } catch (error) {
                                             console.error("Timer operation error:", error);
                                             setTimerError("An error occurred during timer operation");
+                                        } finally {
+                                            setIsTimerOperationPending(false);
                                         }
                                     }}
-                                    className={`group relative w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 transform hover:scale-105 ${
+                                    className={`group relative w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 transform ${
+                                        isTimerOperationPending 
+                                            ? 'opacity-70 cursor-not-allowed'
+                                            : 'hover:scale-105'
+                                    } ${
                                         isRunning
                                             ? 'bg-red-400/90 hover:bg-red-500'
                                             : 'bg-blue-800 hover:bg-blue-700'

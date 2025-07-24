@@ -1,20 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import userAvatar from '/userAvatar.png'
+import logo from "/icon.ico";
 
-// --- SVG Icon Components with enhanced styling ---
-const IconX = ({ className }) => (
+// Close Icon Component
+const IconClose = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <line x1="18" y1="6" x2="6" y2="18"></line>
         <line x1="6" y1="6" x2="18" y2="18"></line>
     </svg>
 );
 
-const IconCheck = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-);
+// About Popup Component
+const AboutPopup = ({ appIcon, appName, appVersion, onClose }) => {
+    const currentYear = new Date().getFullYear();
+    
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-xl w-80 overflow-hidden animate-scaleIn">
+                <div className="relative p-4 flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                        <IconClose className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+                <div className="px-6 pb-6 pt-0 flex flex-col items-center">
+                    <img src={appIcon} alt={appName} className="w-20 h-20 mb-4" />
+                    <h2 className="text-xl font-bold text-gray-800 mb-1">{appName}</h2>
+                    <p className="text-sm text-gray-500 mb-4">Version {appVersion}</p>
+                    <p className="text-xs text-gray-400">© {currentYear} {appName}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
 
+// --- SVG Icon Components with enhanced styling ---
 const IconDashboard = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -39,12 +61,6 @@ const IconDownload = ({ className }) => (
     </svg>
 );
 
-const IconPencil = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-    </svg>
-);
-
 const IconSignOut = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -60,15 +76,8 @@ const IconArrowRight = ({ className }) => (
     </svg>
 );
 
-const IconClock = ({ className }) => (
-    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-    </svg>
-);
-
 // Enhanced MenuItem component with animations and modern styling
-const MenuItem = ({ icon, text, isLast = false, delay = 0 }) => {
+const MenuItem = ({ icon, text, isLast = false, delay = 0, onClick }) => {
     const [isHovered, setIsHovered] = useState(false);
 
     return (
@@ -79,11 +88,14 @@ const MenuItem = ({ icon, text, isLast = false, delay = 0 }) => {
                 animation: 'slideInRight 0.6s ease-out forwards'
             }}
         >
-            <a
-                href="#"
+            <div
                 className="group flex items-center justify-between p-4 rounded-2xl bg-white/70 backdrop-blur-sm border border-white/20 hover:bg-white hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-200/50 text-slate-600 hover:text-slate-800 transition-all duration-300 hover:-translate-y-1"
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
+                onClick={(e) => {
+                    e.preventDefault();
+                    if (onClick) onClick();
+                }}
             >
                 <div className="flex items-center gap-4">
                     <div className="p-2 rounded-xl bg-gradient-to-br from-blue-50 to-blue-50 group-hover:from-blue-100 group-hover:to-blue-100 transition-all duration-300">
@@ -94,33 +106,16 @@ const MenuItem = ({ icon, text, isLast = false, delay = 0 }) => {
                     <span className="font-medium">{text}</span>
                 </div>
                 <IconArrowRight className={`h-4 w-4 text-slate-400 group-hover:text-blue-600 transition-all duration-300 ${isHovered ? 'translate-x-1' : ''}`} />
-            </a>
+            </div>
         </div>
     );
 };
 
-// Status indicator component
-const StatusIndicator = () => (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
-        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-        <span className="text-xs font-medium text-emerald-700">Active</span>
-    </div>
-);
 
 // Main Profile Page Component
 export default function ProfilePage({ user, onClose }) {
     const [mounted, setMounted] = useState(false);
-
-    // Mock user data - replace with your actual user prop
-    // const user = {
-    //     name: userData?.name,
-    //     email: "john.doe@company.com",
-    //     avatar: userAvatar,
-    //     roleId: {
-    //         roleName: "senior developer",
-    //         modules: ['Dashboard', 'TimeTracker', 'Reports', 'Projects', 'profile', 'Guides']
-    //     }
-    // };
+    const [showAboutPopup, setShowAboutPopup] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -131,10 +126,28 @@ export default function ProfilePage({ user, onClose }) {
         item !== 'Dashboard' && item !== 'profile' && item !== 'Guides'
     );
 
+    const appIcon = logo;
+    const appName = "RemoteIntegrity Tracker";
+    const appVersion = "1.0.4";
+
+    // Handle menu item clicks
+    const handleGoToDashboard = () => {
+        window.open("https://app.remoteintegrity.com/dashboard", "_blank");
+    };
+
+    const handleAboutRITracker = () => {
+        setShowAboutPopup(true);
+    };
+
+    const handleCheckForUpdates = () => {
+        // Placeholder for future functionality
+        console.log("Check for updates clicked");
+    };
+
     const menuItems = [
-        { icon: <IconDashboard />, text: "Go To Dashboard" },
-        { icon: <IconInfo />, text: "About RI Tracker" },
-        { icon: <IconDownload />, text: "Check For Updates" },
+        { icon: <IconDashboard />, text: "Go To Dashboard", onClick: handleGoToDashboard },
+        { icon: <IconInfo />, text: "About RI Tracker", onClick: handleAboutRITracker },
+        { icon: <IconDownload />, text: "Check For Updates", onClick: handleCheckForUpdates },
     ];
 
     return (
@@ -180,12 +193,32 @@ export default function ProfilePage({ user, onClose }) {
                         transform: scale(1);
                     }
                 }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.3s ease-out forwards;
+                }
+                .animate-scaleIn {
+                    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
             `}</style>
+            
+            {/* About Popup */}
+            {showAboutPopup && (
+                <AboutPopup 
+                    appIcon={appIcon}
+                    appName={appName}
+                    appVersion={appVersion}
+                    onClose={() => setShowAboutPopup(false)}
+                />
+            )}
 
             <div className={`w-full max-w-md transition-all overflow-hidden duration-700 ease-out ${mounted ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                 <div className="bg-white/80 backdrop-blur-xl  shadow-2xl shadow-blue-500/10 overflow-hidden">
 
-                    {/* Header with gradient background */}
+                    {/* Header with background */}
                     <div className="relative bg-[#002B91] p-8 pb-6">
                         {/* Decorative elements */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
@@ -217,7 +250,6 @@ export default function ProfilePage({ user, onClose }) {
                                         <p className="text-white/80 text-sm font-medium">{user.email}</p>
                                     </div>
                                 </div>
-                                {/*<StatusIndicator />*/}
                             </div>
 
                             {/* Enhanced User Info Card */}
@@ -228,14 +260,6 @@ export default function ProfilePage({ user, onClose }) {
                                         {user.roleId.roleName}
                                     </span>
                                 </div>
-                                {/*<div className="flex items-center gap-3">*/}
-                                {/*    <div className="p-2 rounded-xl bg-white/20 backdrop-blur-sm">*/}
-                                {/*        <IconClock className="h-4 w-4 text-white" />*/}
-                                {/*    </div>*/}
-                                {/*    <p className="text-white/90 font-medium text-sm">*/}
-                                {/*        RI Tracker is monitoring your work hours*/}
-                                {/*    </p>*/}
-                                {/*</div>*/}
                             </div>
                         </div>
                     </div>
@@ -249,6 +273,7 @@ export default function ProfilePage({ user, onClose }) {
                                 text={item.text}
                                 isLast={index === menuItems.length - 1}
                                 delay={index * 100}
+                                onClick={item.onClick}
                             />
                         ))}
                     </nav>
