@@ -36,6 +36,119 @@ const AboutPopup = ({ appIcon, appName, appVersion, onClose }) => {
     );
 };
 
+// Update Popup Component
+const UpdatePopup = ({ 
+    appIcon, 
+    appName, 
+    currentVersion, 
+    latestVersion, 
+    updateStatus, 
+    onClose, 
+    onUpdate, 
+    downloadProgress 
+}) => {
+    const currentYear = new Date().getFullYear();
+    
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-xl w-80 overflow-hidden animate-scaleIn">
+                <div className="relative p-4 flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                        disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+                    >
+                        <IconClose className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+                <div className="px-6 pb-6 pt-0 flex flex-col items-center">
+                    <img src={appIcon} alt={appName} className="w-20 h-20 mb-4" />
+                    <h2 className="text-xl font-bold text-gray-800 mb-1">{appName}</h2>
+                    
+                    {updateStatus === 'checking' && (
+                        <>
+                            <div className="mb-4 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2 text-center">Checking for updates...</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'available' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-1">Current version: {currentVersion}</p>
+                            <p className="text-sm font-medium text-green-600 mb-4">New version available: {latestVersion}</p>
+                            <p className="text-sm text-gray-600 mb-4 text-center">Do you want to update?</p>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={onClose}
+                                    className="px-4 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+                                >
+                                    No
+                                </button>
+                                <button 
+                                    onClick={onUpdate}
+                                    className="px-4 py-1 rounded-lg bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                                >
+                                    Yes
+                                </button>
+                            </div>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'not-available' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-1">Current version: {currentVersion}</p>
+                            <p className="text-sm text-gray-600 mb-4 text-center">You are using the latest version.</p>
+                            {/*<button */}
+                            {/*    onClick={onClose}*/}
+                            {/*    className="px-4 py-1 rounded-md bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium transition-colors"*/}
+                            {/*>*/}
+                            {/*    OK*/}
+                            {/*</button>*/}
+                        </>
+                    )}
+                    
+                    {updateStatus === 'downloading' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-4">Downloading update...</p>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                                <div 
+                                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                                    style={{ width: `${downloadProgress}%` }}
+                                ></div>
+                            </div>
+                            <p className="text-xs text-gray-500">{downloadProgress}% complete</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'installing' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-4">Installing update...</p>
+                            <div className="mb-4 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                            </div>
+                            <p className="text-xs text-gray-500">The application will restart automatically.</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'error' && (
+                        <>
+                            <p className="text-sm text-red-500 mb-4">Error checking for updates.</p>
+                            <button 
+                                onClick={onClose}
+                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                            >
+                                OK
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- SVG Icon Components with enhanced styling ---
 const IconDashboard = ({ className }) => (
     <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
@@ -116,19 +229,21 @@ const MenuItem = ({ icon, text, isLast = false, delay = 0, onClick }) => {
 export default function ProfilePage({ user, onClose }) {
     const [mounted, setMounted] = useState(false);
     const [showAboutPopup, setShowAboutPopup] = useState(false);
+    const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState('');
+    const [currentVersion, setCurrentVersion] = useState('');
+    const [latestVersion, setLatestVersion] = useState('');
+    const [downloadUrl, setDownloadUrl] = useState('');
+    const [downloadProgress, setDownloadProgress] = useState(0);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    // List of services the user is being monitored for
-    const monitoringItems = user.roleId.modules.filter(item =>
-        item !== 'Dashboard' && item !== 'profile' && item !== 'Guides'
-    );
 
     const appIcon = logo;
     const appName = "RemoteIntegrity Tracker";
-    const appVersion = "1.0.4";
+    const appVersion = "1.0.5";
 
     // Handle menu item clicks
     const handleGoToDashboard = () => {
@@ -139,9 +254,79 @@ export default function ProfilePage({ user, onClose }) {
         setShowAboutPopup(true);
     };
 
-    const handleCheckForUpdates = () => {
-        // Placeholder for future functionality
-        console.log("Check for updates clicked");
+    const handleCheckForUpdates = async () => {
+        try {
+            setShowUpdatePopup(true);
+            setUpdateStatus('checking');
+            
+            // Call backend to check for updates
+            const result = await window.pywebview.api.check_for_updates();
+            
+            if (!result.success) {
+                setUpdateStatus('error');
+                return;
+            }
+            
+            setCurrentVersion(result.current_version);
+            setLatestVersion(result.latest_version);
+            
+            if (result.update_available) {
+                setUpdateStatus('available');
+                setDownloadUrl(result.download_url);
+            } else {
+                setUpdateStatus('not-available');
+            }
+        } catch (error) {
+            console.error("Error checking for updates:", error);
+            setUpdateStatus('error');
+        }
+    };
+    
+    const handleUpdate = async () => {
+        try {
+            setUpdateStatus('downloading');
+            setDownloadProgress(0);
+            
+            // Simulate download progress (in a real app, you'd get this from the backend)
+            const progressInterval = setInterval(() => {
+                setDownloadProgress(prev => {
+                    if (prev >= 95) {
+                        clearInterval(progressInterval);
+                        return 95;
+                    }
+                    return prev + 5;
+                });
+            }, 300);
+            
+            // Call backend to download update
+            const downloadResult = await window.pywebview.api.download_update(downloadUrl);
+            
+            clearInterval(progressInterval);
+            
+            if (!downloadResult.success) {
+                setUpdateStatus('error');
+                return;
+            }
+            
+            setDownloadProgress(100);
+            
+            // Short delay to show 100% before installing
+            setTimeout(async () => {
+                setUpdateStatus('installing');
+                
+                // Call backend to install update
+                const installResult = await window.pywebview.api.install_update(downloadResult.file_path);
+                
+                if (!installResult.success) {
+                    setUpdateStatus('error');
+                }
+                // No need to handle success case as app will restart
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error updating:", error);
+            setUpdateStatus('error');
+        }
     };
 
     const menuItems = [
@@ -212,6 +397,24 @@ export default function ProfilePage({ user, onClose }) {
                     appName={appName}
                     appVersion={appVersion}
                     onClose={() => setShowAboutPopup(false)}
+                />
+            )}
+            
+            {/* Update Popup */}
+            {showUpdatePopup && (
+                <UpdatePopup 
+                    appIcon={appIcon}
+                    appName={appName}
+                    currentVersion={currentVersion}
+                    latestVersion={latestVersion}
+                    updateStatus={updateStatus}
+                    downloadProgress={downloadProgress}
+                    onClose={() => {
+                        if (updateStatus !== 'downloading' && updateStatus !== 'installing') {
+                            setShowUpdatePopup(false);
+                        }
+                    }}
+                    onUpdate={handleUpdate}
                 />
             )}
 

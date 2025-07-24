@@ -6,11 +6,16 @@ import sys
 import requests
 import json
 import threading
+import subprocess
+import platform
+import shutil
 from datetime import datetime, timezone
 from config import URLS
 
 
 APP_NAME = "RI_Tracker"
+APP_VERSION = "1.0.5"  # Current version of the application
+GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"  # Replace with your actual GitHub repository
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
 # Ensure the directory exists
@@ -707,6 +712,153 @@ class Api:
             c = conn.cursor()
             c.execute('SELECT project_name, timestamp, duration FROM time_entries ORDER BY id DESC LIMIT 10')
             return [{'project': row[0], 'timestamp': row[1], 'duration': row[2]} for row in c.fetchall()]
+            
+    def compare_versions(self, version1, version2):
+        """Compare two version strings and return True if version2 is newer than version1"""
+        v1_parts = [int(x) for x in version1.split('.')]
+        v2_parts = [int(x) for x in version2.split('.')]
+        
+        # Pad with zeros if versions have different lengths
+        while len(v1_parts) < len(v2_parts):
+            v1_parts.append(0)
+        while len(v2_parts) < len(v1_parts):
+            v2_parts.append(0)
+            
+        # Compare each part
+        for i in range(len(v1_parts)):
+            if v2_parts[i] > v1_parts[i]:
+                return True
+            elif v2_parts[i] < v1_parts[i]:
+                return False
+                
+        # If we get here, versions are equal
+        return False
+        
+    def check_for_updates(self):
+        """Check for updates by querying the GitHub API for the latest release"""
+        try:
+            # Get the latest release from GitHub
+            response = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest")
+            
+            if response.status_code != 200:
+                return {
+                    "success": False,
+                    "message": f"Failed to check for updates. Status code: {response.status_code}"
+                }
+                
+            release_data = response.json()
+            latest_version = release_data.get('tag_name', '').lstrip('v')
+            
+            # If no version found, return error
+            if not latest_version:
+                return {
+                    "success": False,
+                    "message": "Could not determine latest version"
+                }
+                
+            # Compare versions
+            update_available = self.compare_versions(APP_VERSION, latest_version)
+            
+            return {
+                "success": True,
+                "update_available": update_available,
+                "current_version": APP_VERSION,
+                "latest_version": latest_version,
+                "release_notes": release_data.get('body', ''),
+                "download_url": release_data.get('assets', [{}])[0].get('browser_download_url', '') if release_data.get('assets') else ''
+            }
+        except Exception as e:
+            print(f"Error checking for updates: {e}")
+            return {
+                "success": False,
+                "message": f"An error occurred while checking for updates: {str(e)}"
+            }
+            
+    def download_update(self, download_url):
+        """Download the update from the provided URL"""
+        try:
+            # Create updates directory if it doesn't exist
+            updates_dir = os.path.join(DATA_DIR, 'updates')
+            os.makedirs(updates_dir, exist_ok=True)
+            
+            # Download the file
+            response = requests.get(download_url, stream=True)
+            if response.status_code != 200:
+                return {
+                    "success": False,
+                    "message": f"Failed to download update. Status code: {response.status_code}"
+                }
+                
+            # Get filename from URL
+            filename = os.path.basename(download_url)
+            file_path = os.path.join(updates_dir, filename)
+            
+            # Save the file
+            with open(file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        
+            return {
+                "success": True,
+                "file_path": file_path
+            }
+        except Exception as e:
+            print(f"Error downloading update: {e}")
+            return {
+                "success": False,
+                "message": f"An error occurred while downloading the update: {str(e)}"
+            }
+            
+    def install_update(self, file_path):
+        """Install the update and restart the application"""
+        try:
+            # Check if file exists
+            if not os.path.exists(file_path):
+                return {
+                    "success": False,
+                    "message": "Update file not found"
+                }
+                
+            # Get file extension
+            _, ext = os.path.splitext(file_path)
+            
+            # Handle different file types
+            if ext.lower() == '.exe':
+                # For Windows executable installers
+                # Start the installer and exit current app
+                subprocess.Popen([file_path, '/SILENT', '/CLOSEAPPLICATIONS'])
+                # Schedule app exit
+                threading.Timer(1.0, lambda: os._exit(0)).start()
+                return {"success": True, "message": "Installing update..."}
+                
+            elif ext.lower() == '.msi':
+                # For MSI installers
+                subprocess.Popen(['msiexec', '/i', file_path, '/quiet', '/norestart'])
+                threading.Timer(1.0, lambda: os._exit(0)).start()
+                return {"success": True, "message": "Installing update..."}
+                
+            elif ext.lower() in ['.zip', '.7z']:
+                # For zip archives, extract and replace current executable
+                # This is a simplified example - actual implementation would depend on your app structure
+                # You might need to extract files, copy them to the right location, etc.
+                return {
+                    "success": False,
+                    "message": "Archive installation not implemented"
+                }
+                
+            else:
+                return {
+                    "success": False,
+                    "message": f"Unsupported update file type: {ext}"
+                }
+                
+        except Exception as e:
+            print(f"Error installing update: {e}")
+            return {
+                "success": False,
+                "message": f"An error occurred while installing the update: {str(e)}"
+            }
 
 if __name__ == '__main__':
     init_db()

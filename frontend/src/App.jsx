@@ -4,7 +4,7 @@ import ProfilePage from './Pages/ProfilePage';
 import Login from "./Pages/Login";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
-import {QueryClient, QueryClientProvider, useMutation, useQuery} from "@tanstack/react-query";
+import {QueryClient, QueryClientProvider, useQuery} from "@tanstack/react-query";
 
 // Compact CSS with modern animations and glassmorphism effects
 const compactStyles = `
