@@ -14,7 +14,7 @@ from config import URLS
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.5"  # Current version of the application
+APP_VERSION = "1.0.7"  # Current version of the application
 GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"  # Replace with your actual GitHub repository
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 

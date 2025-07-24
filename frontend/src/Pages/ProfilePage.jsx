@@ -242,8 +242,8 @@ export default function ProfilePage({ user, onClose }) {
 
 
     const appIcon = logo;
-    const appName = "RemoteIntegrity Tracker";
-    const appVersion = "1.0.5";
+    const appName = "RI Tracker";
+    const appVersion = "1.0.7";
 
     // Handle menu item clicks
     const handleGoToDashboard = () => {

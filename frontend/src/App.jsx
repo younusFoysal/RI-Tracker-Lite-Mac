@@ -5,6 +5,7 @@ import Login from "./Pages/Login";
 import { AuthProvider, useAuth } from './context/AuthContext';
 import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
 import {QueryClient, QueryClientProvider, useQuery} from "@tanstack/react-query";
+import logo from "/icon.ico";
 
 // Compact CSS with modern animations and glassmorphism effects
 const compactStyles = `
@@ -53,6 +54,14 @@ const compactStyles = `
   
   .scale-in {
     animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  .animate-scaleIn {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
   
   .glass-card {
@@ -115,6 +124,121 @@ const compactStyles = `
     transform: translate(-50%, -50%);
   }
 `;
+
+// Close Icon Component
+const IconClose = ({ className }) => (
+    <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className={className} xmlns="http://www.w3.org/2000/svg">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+);
+
+// Update Popup Component
+const UpdatePopup = ({ 
+    appIcon, 
+    appName, 
+    currentVersion, 
+    latestVersion, 
+    updateStatus, 
+    onClose, 
+    onUpdate, 
+    downloadProgress 
+}) => {
+    const currentYear = new Date().getFullYear();
+    
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-xl w-80 overflow-hidden animate-scaleIn">
+                <div className="relative p-4 flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                        disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+                    >
+                        <IconClose className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+                <div className="px-6 pb-6 pt-0 flex flex-col items-center">
+                    <img src={appIcon} alt={appName} className="w-20 h-20 mb-4" />
+                    <h2 className="text-xl font-bold text-gray-800 mb-1">{appName}</h2>
+                    
+                    {updateStatus === 'checking' && (
+                        <>
+                            <div className="mb-4 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800"></div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2 text-center">Checking for updates...</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'available' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-1">Current version: {currentVersion}</p>
+                            <p className="text-sm font-medium text-green-600 mb-4">New version available: {latestVersion}</p>
+                            <p className="text-sm text-gray-600 mb-4 text-center">Do you want to update?</p>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={onClose}
+                                    className="px-4 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium transition-colors"
+                                >
+                                    No
+                                </button>
+                                <button 
+                                    onClick={onUpdate}
+                                    className="px-4 py-1 rounded-lg bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                                >
+                                    Yes
+                                </button>
+                            </div>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'not-available' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-1">Current version: {currentVersion}</p>
+                            <p className="text-sm text-gray-600 mb-4 text-center">You are using the latest version.</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'downloading' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-4">Downloading update...</p>
+                            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                                <div 
+                                    className="bg-blue-800 h-2.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${downloadProgress}%` }}
+                                ></div>
+                            </div>
+                            <p className="text-xs text-gray-500">{downloadProgress}% complete</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'installing' && (
+                        <>
+                            <p className="text-sm text-gray-500 mb-4">Installing update...</p>
+                            <div className="mb-4 flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-800"></div>
+                            </div>
+                            <p className="text-xs text-gray-500">The application will restart automatically.</p>
+                        </>
+                    )}
+                    
+                    {updateStatus === 'error' && (
+                        <>
+                            <p className="text-sm text-red-500 mb-4">Error checking for updates.</p>
+                            <button 
+                                onClick={onClose}
+                                className="px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                            >
+                                OK
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // Compact SVG Icon Components
 const IconChevronDown = ({ className }) => (
@@ -213,7 +337,15 @@ function AppContent() {
     const [showProfilePage, setShowProfilePage] = useState(false);
     const [isRotating, setIsRotating] = useState(false);
     const { isAuthenticated, logout, currentUser } = useAuth();
-    const axiosSecure = useAxiosSecure()
+    const axiosSecure = useAxiosSecure();
+    
+    // Update checking state variables
+    const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+    const [updateStatus, setUpdateStatus] = useState('');
+    const [currentVersion, setCurrentVersion] = useState('');
+    const [latestVersion, setLatestVersion] = useState('');
+    const [downloadUrl, setDownloadUrl] = useState('');
+    const [downloadProgress, setDownloadProgress] = useState(0);
 
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
@@ -277,6 +409,123 @@ function AppContent() {
         };
 
         fetchInitialStats();
+    }, []);
+    
+    // Handle checking for updates (used for manual checks from profile page)
+    const handleCheckForUpdates = async () => {
+        try {
+            setShowUpdatePopup(true);
+            setUpdateStatus('checking');
+            
+            // Call backend to check for updates
+            const result = await window.pywebview.api.check_for_updates();
+            
+            if (!result.success) {
+                setUpdateStatus('error');
+                return;
+            }
+            
+            setCurrentVersion(result.current_version);
+            setLatestVersion(result.latest_version);
+            
+            if (result.update_available) {
+                setUpdateStatus('available');
+                setDownloadUrl(result.download_url);
+            } else {
+                setUpdateStatus('not-available');
+                // Auto-close the popup after 3 seconds if no update is available
+                setTimeout(() => {
+                    setShowUpdatePopup(false);
+                }, 3000);
+            }
+        } catch (error) {
+            console.error("Error checking for updates:", error);
+            setUpdateStatus('error');
+        }
+    };
+    
+    // Check for updates on startup - only show popup if update is available
+    const checkForUpdatesOnStartup = async () => {
+        try {
+            // Call backend to check for updates without showing popup
+            const result = await window.pywebview.api.check_for_updates();
+            
+            if (!result.success) {
+                console.error("Error checking for updates on startup");
+                return;
+            }
+            
+            setCurrentVersion(result.current_version);
+            setLatestVersion(result.latest_version);
+            
+            // Only show popup if an update is available
+            if (result.update_available) {
+                setShowUpdatePopup(true);
+                setUpdateStatus('available');
+                setDownloadUrl(result.download_url);
+            }
+        } catch (error) {
+            console.error("Error checking for updates on startup:", error);
+        }
+    };
+    
+    // Handle update process
+    const handleUpdate = async () => {
+        try {
+            setUpdateStatus('downloading');
+            setDownloadProgress(0);
+            
+            // Simulate download progress
+            const progressInterval = setInterval(() => {
+                setDownloadProgress(prev => {
+                    if (prev >= 95) {
+                        clearInterval(progressInterval);
+                        return 95;
+                    }
+                    return prev + 5;
+                });
+            }, 300);
+            
+            // Call backend to download update
+            const downloadResult = await window.pywebview.api.download_update(downloadUrl);
+            
+            clearInterval(progressInterval);
+            
+            if (!downloadResult.success) {
+                setUpdateStatus('error');
+                return;
+            }
+            
+            setDownloadProgress(100);
+            
+            // Short delay to show 100% before installing
+            setTimeout(async () => {
+                setUpdateStatus('installing');
+                
+                // Call backend to install update
+                const installResult = await window.pywebview.api.install_update(downloadResult.file_path);
+                
+                if (!installResult.success) {
+                    setUpdateStatus('error');
+                }
+                // No need to handle success case as app will restart
+            }, 500);
+            
+        } catch (error) {
+            console.error("Error updating:", error);
+            setUpdateStatus('error');
+        }
+    };
+    
+    // Effect to check for updates when the app starts
+    useEffect(() => {
+        // Check for updates when the app starts, but with a slight delay
+        // to ensure the app is fully loaded first
+        const updateCheckTimer = setTimeout(() => {
+            checkForUpdatesOnStartup();
+        }, 2000);
+        
+        return () => clearTimeout(updateCheckTimer);
     }, []);
 
     // Effect to handle the timer logic
@@ -372,9 +621,32 @@ function AppContent() {
         return <ProfilePage user={currentUser} onClose={handleCloseProfile} />;
     }
 
+    // App constants
+    const appIcon = logo;
+    const appName = "RI Tracker";
+    const appVersion = "1.0.7";
+
     return (
         <div className="app-container gradient-bg">
             <style>{compactStyles}</style>
+            
+            {/* Update Popup */}
+            {showUpdatePopup && (
+                <UpdatePopup 
+                    appIcon={appIcon}
+                    appName={appName}
+                    currentVersion={currentVersion}
+                    latestVersion={latestVersion}
+                    updateStatus={updateStatus}
+                    downloadProgress={downloadProgress}
+                    onClose={() => {
+                        if (updateStatus !== 'downloading' && updateStatus !== 'installing') {
+                            setShowUpdatePopup(false);
+                        }
+                    }}
+                    onUpdate={handleUpdate}
+                />
+            )}
 
             <div className="h-full glass-card  overflow-hidden modern-shadow fade-in flex flex-col">
 
@@ -708,7 +980,7 @@ function AuthenticatedApp() {
                     <div className="text-center">
                         <div className="w-12 h-12 mx-auto mb-3 relative">
                             <div className="absolute inset-0 rounded-full border-3 border-blue-200"></div>
-                            <div className="absolute inset-0 rounded-full border-3 border-blue-600 border-t-transparent animate-spin"></div>
+                            <div className="absolute inset-0 rounded-full border-3 border-blue-800 border-t-transparent animate-spin"></div>
                         </div>
                         <h2 className="text-lg font-semibold text-gray-800 mb-1">TimeSync Pro</h2>
                         <p className="text-gray-600 text-sm">Loading workspace...</p>
