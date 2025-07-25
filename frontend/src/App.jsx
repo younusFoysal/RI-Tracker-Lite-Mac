@@ -350,6 +350,24 @@ function AppContent() {
     // Projects list
     const projects = ['RemoteIntegrity', 'Sagaya Labs', 'Energy Professionals'];
 
+
+
+    // Image Upload API Details
+    // POST - https://files.remoteintegrity.com/api/files/5a7f64a1-ab0e-4544-8fcb-4a7b2fc3d428/upload
+    // Body - form data - file - image file
+    // Headers - x-api-key - 2a978046cf9eebb8f8134281a3e5106d05723cae3eaf8ec58f2596d95feca3de   - Add this key and value in the headers
+    // Response -
+    // {
+    //     "success": true,
+    //     "data": {
+    //     "url": "https://remoteintegrity.s3.us-east-1.amazonaws.com/tracker_app07-2025/25/user-avatar.png",
+    //         "key": "tracker_app07-2025/25/user-avatar.png"
+    // },
+    //     "message": "File uploaded successfully"
+    // }
+
+
+
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {

@@ -9,13 +9,18 @@ import threading
 import subprocess
 import platform
 import shutil
+import random
+import tempfile
+import base64
+import mss
+import mss.tools
 from datetime import datetime, timezone
 from config import URLS
 
 
 APP_NAME = "RI_Tracker"
 APP_VERSION = "1.0.7"  # Current version of the application
-GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"  # Replace with your actual GitHub repository
+GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
 # Ensure the directory exists
@@ -79,6 +84,14 @@ class Api:
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
         self.event_throttle_interval = 0.5  # seconds between counting events
+        
+        # Screenshot variables
+        self.screenshot_timer = None
+        self.screenshot_min_interval = 60  # 1 minute in seconds
+        self.screenshot_max_interval = 480  # 8 minutes in seconds
+        self.current_screenshot = None
+        self.screenshot_timestamp = None
+        self.screenshots_for_session = []
         
         self.load_auth_data()
 
@@ -283,15 +296,31 @@ class Api:
             # Create session update data
             end_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
+            # Prepare screenshots data
+            screenshots_data = self.screenshots_for_session.copy()
+            
+            # If no screenshots were captured during this interval, add a fallback
+            if not screenshots_data and not is_final_update:
+                # Try to take a screenshot now
+                screenshot_path = self.take_screenshot()
+                if screenshot_path:
+                    screenshot_data = self.upload_screenshot(screenshot_path)
+                    if screenshot_data:
+                        screenshots_data.append({
+                            'timestamp': screenshot_data['timestamp'],
+                            'imageUrl': screenshot_data['url']
+                        })
+            
             update_data = {
                 "endTime": end_time,
                 "activeTime": active_time,
                 "idleTime": idle_time,
                 "keyboardActivityRate": keyboard_rate,
                 "mouseActivityRate": mouse_rate,
-                #"timezone": "America/New_York"
+                "screenshots": screenshots_data,
                 "timezone": "UTC"
             }
+            print(f"Update Session: {update_data}")
             
             # Send request to update session
             response = requests.patch(
@@ -388,6 +417,12 @@ class Api:
                 is_final_update=False
             )
             
+            # Clear the screenshots array for the next interval
+            self.screenshots_for_session = []
+            
+            # Schedule a new screenshot for the next interval
+            self.schedule_screenshot()
+            
             # Schedule the next update if timer is still running
             if self.start_time:
                 self.session_update_timer = threading.Timer(self.session_update_interval, update_session_periodically)
@@ -399,11 +434,172 @@ class Api:
         self.session_update_timer.daemon = True
         self.session_update_timer.start()
         
+        # Schedule the first screenshot
+        self.schedule_screenshot()
+        
     def stop_session_updates(self):
         """Stop periodic session updates"""
         if self.session_update_timer:
             self.session_update_timer.cancel()
             self.session_update_timer = None
+        
+        # Also stop any pending screenshot timer
+        if self.screenshot_timer:
+            self.screenshot_timer.cancel()
+            self.screenshot_timer = None
+    
+    def take_screenshot(self):
+        """Take a screenshot of all monitors
+        
+        This method captures a screenshot of all monitors and saves it to a temporary file.
+        It uses the mss package for cross-platform compatibility and multi-monitor support.
+        
+        Returns:
+            str: Path to the temporary file containing the screenshot, or None if the capture failed
+        """
+        try:
+            # Create a temporary file to save the screenshot
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_file:
+                temp_filename = temp_file.name
+            
+            # Use mss to capture screenshots of all monitors
+            with mss.mss() as sct:
+                # Capture all monitors (monitor 0 is all monitors combined)
+                screenshot = sct.grab(sct.monitors[0])
+                
+                # Save the screenshot to the temporary file
+                mss.tools.to_png(screenshot.rgb, screenshot.size, output=temp_filename)
+                
+                # Log monitor information for debugging
+                print(f"Captured screenshot of all monitors: {len(sct.monitors)-1} monitor(s) detected")
+                for i, monitor in enumerate(sct.monitors[1:], 1):
+                    print(f"Monitor {i}: {monitor['width']}x{monitor['height']} at position ({monitor['left']},{monitor['top']})")
+            
+            # Record the timestamp when the screenshot was taken (in UTC)
+            self.screenshot_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            
+            # Return the filename for upload
+            return temp_filename
+        except Exception as e:
+            print(f"Error taking screenshot: {e}")
+            return None
+    
+    def upload_screenshot(self, screenshot_path):
+        """Upload a screenshot to the API and return the URL
+        
+        This method uploads a screenshot to the RemoteIntegrity file server using the API
+        details provided in App.jsx. It handles the API request, processes the response,
+        and cleans up the temporary file after upload.
+        
+        Args:
+            screenshot_path (str): Path to the screenshot file to upload
+            
+        Returns:
+            dict: Dictionary containing the URL and timestamp of the uploaded screenshot,
+                  or None if the upload failed
+        """
+        if not screenshot_path or not os.path.exists(screenshot_path):
+            print("Screenshot path is invalid or file does not exist")
+            return None
+        
+        try:
+            # Prepare the file for upload
+            files = {'file': open(screenshot_path, 'rb')}
+            
+            # Set headers with API key from App.jsx
+            headers = {
+                'x-api-key': '2a978046cf9eebb8f8134281a3e5106d05723cae3eaf8ec58f2596d95feca3de'
+            }
+            
+            # Make the API request to the endpoint from App.jsx
+            response = requests.post(
+                'http://5.78.136.221:3020/api/files/5a7f64a1-ab0e-4544-8fcb-4a7b2fc3d428/upload',
+                files=files,
+                headers=headers
+            )
+
+            print(f"Image Upload response: {response}")
+
+            # Clean up the temporary file regardless of upload success https://files.remoteintegrity.com
+            try:
+                os.unlink(screenshot_path)
+            except Exception as cleanup_error:
+                print(f"Warning: Failed to clean up temporary file: {cleanup_error}")
+            
+            # Process the response
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success'):
+                    return {
+                        'url': data['data']['url'],
+                        'timestamp': self.screenshot_timestamp
+                    }
+                else:
+                    print(f"API returned success=false: {data.get('message', 'No error message')}")
+            else:
+                print(f"API request failed with status code {response.status_code}")
+            
+            return None
+        except Exception as e:
+            print(f"Error uploading screenshot: {e}")
+            return None
+            
+    def schedule_screenshot(self):
+        """Schedule a screenshot to be taken at a random time between 1-8 minutes
+        
+        This method schedules a screenshot to be taken at a random time between
+        self.screenshot_min_interval (1 minute) and self.screenshot_max_interval (8 minutes).
+        The screenshot is then uploaded to the server and stored for the next session update.
+        
+        The method ensures that only one screenshot timer is active at a time by canceling
+        any existing timer before creating a new one.
+        
+        Returns:
+            None
+        """
+        if not self.start_time:
+            print("Cannot schedule screenshot: Timer not running")
+            return
+            
+        # Clear any existing screenshot timer to avoid multiple timers
+        if self.screenshot_timer:
+            self.screenshot_timer.cancel()
+            self.screenshot_timer = None
+            
+        # Generate a random interval between min and max (1-8 minutes)
+        random_interval = random.randint(self.screenshot_min_interval, self.screenshot_max_interval)
+        
+        def take_and_upload_screenshot():
+            """Inner function to take and upload a screenshot when the timer fires"""
+            if not self.start_time:
+                print("Timer stopped before screenshot could be taken")
+                return
+                
+            # Take a screenshot
+            screenshot_path = self.take_screenshot()
+            
+            if screenshot_path:
+                # Upload the screenshot
+                screenshot_data = self.upload_screenshot(screenshot_path)
+                
+                if screenshot_data:
+                    # Store the screenshot data for the next session update
+                    self.screenshots_for_session.append({
+                        'timestamp': screenshot_data['timestamp'],
+                        'imageUrl': screenshot_data['url']
+                    })
+                    print(f"Screenshot taken and uploaded: {screenshot_data['url']}")
+                else:
+                    print("Failed to upload screenshot")
+            else:
+                print("Failed to take screenshot")
+        
+        # Schedule the screenshot using a timer
+        self.screenshot_timer = threading.Timer(random_interval, take_and_upload_screenshot)
+        self.screenshot_timer.daemon = True  # Allow the program to exit even if timer is still running
+        self.screenshot_timer.start()
+        
+        print(f"Screenshot scheduled in {random_interval} seconds ({random_interval/60:.1f} minutes)")
     
     def start_timer(self, project_name):
         """Start the timer and create a new session"""
@@ -423,6 +619,13 @@ class Api:
         self.last_active_check_time = current_time
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
+        
+        # Reset screenshot variables
+        self.screenshots_for_session = []
+        self.screenshot_timestamp = None
+        if self.screenshot_timer:
+            self.screenshot_timer.cancel()
+            self.screenshot_timer = None
         
         # Start activity tracking
         self.start_activity_tracking()
