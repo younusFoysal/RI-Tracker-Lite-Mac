@@ -19,7 +19,7 @@ from config import URLS
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.7"  # Current version of the application
+APP_VERSION = "1.0.8"  # Current version of the application
 GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
@@ -503,31 +503,38 @@ class Api:
             return None
         
         try:
-            # Prepare the file for upload
-            files = {'file': open(screenshot_path, 'rb')}
-            
-            # Set headers with API key from App.jsx
-            headers = {
-                'x-api-key': '2a978046cf9eebb8f8134281a3e5106d05723cae3eaf8ec58f2596d95feca3de'
-            }
-            
-            # Make the API request to the endpoint from App.jsx
-            response = requests.post(
-                'http://5.78.136.221:3020/api/files/5a7f64a1-ab0e-4544-8fcb-4a7b2fc3d428/upload',
-                files=files,
-                headers=headers
-            )
+            # Read the image file and encode it as base64
+            with open(screenshot_path, 'rb') as image_file:
+                # Prepare the file for upload using base64 encoding
+                files = {
+                    'file': (os.path.basename(screenshot_path), image_file, 'image/png')
+                }
 
-            print(f"Image Upload response: {response}")
+                # Set headers with API key from App.jsx
+                # Note: We don't manually set Content-Type for multipart/form-data
+                # as requests will set it automatically with the correct boundary
+                headers = {
+                    'x-api-key': '2a978046cf9eebb8f8134281a3e5106d05723cae3eaf8ec58f2596d95feca3de'
+                }
 
-            # Clean up the temporary file regardless of upload success https://files.remoteintegrity.com
+                # Make the API request to the correct endpoint
+                # Using files=files for multipart/form-data instead of json=files
+                response = requests.post(
+                    'http://5.78.136.221:3020/api/files/5a7f64a1-ab0e-4544-8fcb-4a7b2fc3d428/upload',
+                    files=files,
+                    headers=headers
+                )
+
+            print(f"Image Upload response: {response.json()}")
+
+            # Clean up the temporary file regardless of upload success
             try:
                 os.unlink(screenshot_path)
             except Exception as cleanup_error:
                 print(f"Warning: Failed to clean up temporary file: {cleanup_error}")
             
             # Process the response
-            if response.status_code == 200:
+            if response.status_code == 201:
                 data = response.json()
                 if data.get('success'):
                     return {
