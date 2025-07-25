@@ -241,7 +241,8 @@ class Api:
                 "companyId": company_id,
                 "startTime": start_time,
                 "notes": "Session from RI Tracker Lite APP v1.",
-                "timezone": "America/New_York"
+                # "timezone": "America/New_York"
+                "timezone": "UTC"
             }
             
             # Send request to create session
@@ -288,7 +289,8 @@ class Api:
                 "idleTime": idle_time,
                 "keyboardActivityRate": keyboard_rate,
                 "mouseActivityRate": mouse_rate,
-                "timezone": "America/New_York"
+                #"timezone": "America/New_York"
+                "timezone": "UTC"
             }
             
             # Send request to update session
