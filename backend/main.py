@@ -14,6 +14,7 @@ import tempfile
 import base64
 import mss
 import mss.tools
+import psutil
 from datetime import datetime, timezone
 from config import URLS
 
@@ -92,6 +93,13 @@ class Api:
         self.current_screenshot = None
         self.screenshot_timestamp = None
         self.screenshots_for_session = []
+        
+        # Application tracking variables
+        self.applications_usage = {}  # Dictionary to store application usage: {app_name: {timeSpent: seconds, lastSeen: timestamp}}
+        self.last_app_check_time = None
+        self.app_check_interval = 5  # seconds between application checks
+        self.app_timer = None
+        self.applications_for_session = []  # List to store applications for the current session update
         
         self.load_auth_data()
 
@@ -311,6 +319,9 @@ class Api:
                             'imageUrl': screenshot_data['url']
                         })
             
+            # Get application usage data
+            applications_data = self.prepare_applications_for_session()
+            
             update_data = {
                 "endTime": end_time,
                 "activeTime": active_time,
@@ -318,6 +329,7 @@ class Api:
                 "keyboardActivityRate": keyboard_rate,
                 "mouseActivityRate": mouse_rate,
                 "screenshots": screenshots_data,
+                "applications": applications_data,
                 "timezone": "UTC"
             }
             print(f"Update Session: {update_data}")
@@ -419,6 +431,9 @@ class Api:
             
             # Clear the screenshots array for the next interval
             self.screenshots_for_session = []
+            
+            # Clear the applications usage data for the next interval
+            self.applications_usage = {}
             
             # Schedule a new screenshot for the next interval
             self.schedule_screenshot()
@@ -633,9 +648,20 @@ class Api:
         if self.screenshot_timer:
             self.screenshot_timer.cancel()
             self.screenshot_timer = None
+            
+        # Reset application tracking variables
+        self.applications_usage = {}
+        self.last_app_check_time = current_time
+        self.applications_for_session = []
+        if self.app_timer:
+            self.app_timer.cancel()
+            self.app_timer = None
         
         # Start activity tracking
         self.start_activity_tracking()
+        
+        # Start application tracking
+        self.start_application_tracking()
         
         # Start stats updates
         stats = self.start_stats_updates()
@@ -675,6 +701,9 @@ class Api:
             
             # Stop activity tracking
             self.stop_activity_tracking()
+            
+            # Stop application tracking
+            self.stop_application_tracking()
             
             # Stop session updates
             self.stop_session_updates()
@@ -862,6 +891,132 @@ class Api:
             "mouse_rate": self.mouse_activity_rate,
             "is_idle": self.is_idle
         }
+        
+    def check_running_applications(self):
+        """Check running applications and update application usage data
+        
+        This method uses psutil to get information about running processes,
+        filters out system processes, and updates the application usage data.
+        """
+        if not self.start_time:
+            return
+            
+        current_time = time.time()
+        
+        # If this is the first check, initialize last_app_check_time
+        if self.last_app_check_time is None:
+            self.last_app_check_time = current_time
+            
+        # Calculate time elapsed since last check
+        time_elapsed = current_time - self.last_app_check_time
+        self.last_app_check_time = current_time
+        
+        # Get current timestamp in ISO format
+        current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        
+        # Get list of running processes
+        try:
+            # Get all running processes
+            active_apps = {}
+            
+            for proc in psutil.process_iter(['pid', 'name', 'exe', 'username']):
+                try:
+                    # Get process info
+                    proc_info = proc.info
+                    
+                    # Skip system processes and processes without a name
+                    if not proc_info['name'] or not proc_info['exe']:
+                        continue
+                        
+                    # Use the executable name as the app name
+                    app_name = os.path.basename(proc_info['exe'])
+                    
+                    # Add to active apps
+                    if app_name not in active_apps:
+                        active_apps[app_name] = {
+                            'name': app_name,
+                            'exe': proc_info['exe']
+                        }
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
+            
+            # Update application usage data
+            for app_name, app_info in active_apps.items():
+                if app_name in self.applications_usage:
+                    # Update existing application
+                    self.applications_usage[app_name]['timeSpent'] += time_elapsed
+                    self.applications_usage[app_name]['lastSeen'] = current_timestamp
+                else:
+                    # Add new application
+                    self.applications_usage[app_name] = {
+                        'name': app_name,
+                        'timeSpent': time_elapsed,
+                        'lastSeen': current_timestamp,
+                        'exe': app_info['exe']
+                    }
+                    
+        except Exception as e:
+            print(f"Error checking running applications: {e}")
+            
+    def start_application_tracking(self):
+        """Start the application tracking thread"""
+        if self.app_timer:
+            return
+            
+        def app_check():
+            if not self.start_time:
+                return
+                
+            self.check_running_applications()
+            
+            # Schedule the next check if timer is still running
+            if self.start_time:
+                self.app_timer = threading.Timer(self.app_check_interval, app_check)
+                self.app_timer.daemon = True
+                self.app_timer.start()
+        
+        # Initialize application tracking
+        self.last_app_check_time = time.time()
+        
+        # Start the application check timer
+        self.app_timer = threading.Timer(self.app_check_interval, app_check)
+        self.app_timer.daemon = True
+        self.app_timer.start()
+    
+    def stop_application_tracking(self):
+        """Stop the application tracking thread"""
+        if self.app_timer:
+            self.app_timer.cancel()
+            self.app_timer = None
+            
+    def prepare_applications_for_session(self):
+        """Prepare application data for session updates
+        
+        This method converts the application usage data from the applications_usage
+        dictionary to the format required by the API.
+        
+        Returns:
+            list: A list of application usage data in the format required by the API
+        """
+        applications_data = []
+        
+        # Get current timestamp in ISO format
+        current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        
+        # Convert applications_usage dictionary to list of application usage data
+        for app_name, app_info in self.applications_usage.items():
+            # Only include applications with significant usage (more than 1 second)
+            if app_info['timeSpent'] > 1:
+                applications_data.append({
+                    'name': app_name,
+                    'timeSpent': int(app_info['timeSpent']),  # Convert to integer
+                    'timestamp': app_info['lastSeen'] if 'lastSeen' in app_info else current_timestamp
+                })
+        
+        # Sort by timeSpent in descending order
+        applications_data.sort(key=lambda x: x['timeSpent'], reverse=True)
+        
+        return applications_data
     
     def get_daily_stats(self):
         """Get daily stats for the current employee"""
