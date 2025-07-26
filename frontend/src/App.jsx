@@ -653,7 +653,7 @@ function AppContent() {
     // App constants
     const appIcon = logo;
     const appName = "RI Tracker";
-    const appVersion = "1.0.8";
+    const appVersion = "1.0.9";
 
     return (
         <div className="app-container gradient-bg">

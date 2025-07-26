@@ -1,6 +1,6 @@
 [Setup]
 AppName=RI Tracker
-AppVersion=1.0.8
+AppVersion=1.0.9
 DefaultDirName={pf}\RI Tracker
 DefaultGroupName=RI Tracker
 OutputDir=dist

@@ -243,7 +243,7 @@ export default function ProfilePage({ user, onClose }) {
 
     const appIcon = logo;
     const appName = "RI Tracker";
-    const appVersion = "1.0.8";
+    const appVersion = "1.0.9";
 
     // Handle menu item clicks
     const handleGoToDashboard = () => {

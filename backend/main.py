@@ -15,12 +15,15 @@ import base64
 import mss
 import mss.tools
 import psutil
-from datetime import datetime, timezone
+import glob
+import re
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from config import URLS
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.8"  # Current version of the application
+APP_VERSION = "1.0.9"  # Current version of the application
 GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
@@ -100,6 +103,14 @@ class Api:
         self.app_check_interval = 5  # seconds between application checks
         self.app_timer = None
         self.applications_for_session = []  # List to store applications for the current session update
+        
+        # Browser link tracking variables
+        self.links_usage = {}  # Dictionary to store link usage: {url: {title: string, timeSpent: seconds, lastSeen: timestamp}}
+        self.last_link_check_time = None
+        self.link_check_interval = 30  # seconds between link checks
+        self.link_timer = None
+        self.links_for_session = []  # List to store links for the current session update
+        self.supported_browsers = ['chrome', 'brave', 'edge', 'firefox', 'safari']
         
         self.load_auth_data()
 
@@ -322,6 +333,9 @@ class Api:
             # Get application usage data
             applications_data = self.prepare_applications_for_session()
             
+            # Get link usage data
+            links_data = self.prepare_links_for_session()
+            
             update_data = {
                 "endTime": end_time,
                 "activeTime": active_time,
@@ -330,6 +344,8 @@ class Api:
                 "mouseActivityRate": mouse_rate,
                 "screenshots": screenshots_data,
                 "applications": applications_data,
+                "links": links_data,
+                "notes": "Session from RI Tracker Lite APP v1.",
                 "timezone": "UTC"
             }
             print(f"Update Session: {update_data}")
@@ -434,6 +450,9 @@ class Api:
             
             # Clear the applications usage data for the next interval
             self.applications_usage = {}
+            
+            # Clear the links usage data for the next interval
+            self.links_usage = {}
             
             # Schedule a new screenshot for the next interval
             self.schedule_screenshot()
@@ -656,12 +675,23 @@ class Api:
         if self.app_timer:
             self.app_timer.cancel()
             self.app_timer = None
+            
+        # Reset link tracking variables
+        self.links_usage = {}
+        self.last_link_check_time = current_time
+        self.links_for_session = []
+        if self.link_timer:
+            self.link_timer.cancel()
+            self.link_timer = None
         
         # Start activity tracking
         self.start_activity_tracking()
         
         # Start application tracking
         self.start_application_tracking()
+        
+        # Start link tracking
+        self.start_link_tracking()
         
         # Start stats updates
         stats = self.start_stats_updates()
@@ -704,6 +734,9 @@ class Api:
             
             # Stop application tracking
             self.stop_application_tracking()
+            
+            # Stop link tracking
+            self.stop_link_tracking()
             
             # Stop session updates
             self.stop_session_updates()
@@ -1017,6 +1050,922 @@ class Api:
         applications_data.sort(key=lambda x: x['timeSpent'], reverse=True)
         
         return applications_data
+        
+    def get_browser_paths(self):
+        """Get browser history database paths based on platform
+        
+        This method returns a dictionary of browser history database paths
+        for each supported browser on the current platform.
+        
+        Returns:
+            dict: A dictionary of browser history database paths
+        """
+        browser_paths = {}
+        system = platform.system()
+        home = os.path.expanduser("~")
+        
+        if system == "Windows":
+            # Windows paths
+            local_app_data = os.environ.get('LOCALAPPDATA', os.path.join(home, 'AppData', 'Local'))
+            app_data = os.environ.get('APPDATA', os.path.join(home, 'AppData', 'Roaming'))
+            
+            # Chrome
+            chrome_path = os.path.join(local_app_data, 'Google', 'Chrome', 'User Data')
+            browser_paths['chrome'] = self._find_chromium_history_files(chrome_path)
+            
+            # Brave
+            brave_path = os.path.join(local_app_data, 'BraveSoftware', 'Brave-Browser', 'User Data')
+            browser_paths['brave'] = self._find_chromium_history_files(brave_path)
+            
+            # Edge
+            edge_path = os.path.join(local_app_data, 'Microsoft', 'Edge', 'User Data')
+            browser_paths['edge'] = self._find_chromium_history_files(edge_path)
+            
+            # Firefox
+            firefox_path = os.path.join(app_data, 'Mozilla', 'Firefox', 'Profiles')
+            browser_paths['firefox'] = self._find_firefox_history_files(firefox_path)
+            
+        elif system == "Darwin":  # macOS
+            # Chrome
+            chrome_path = os.path.join(home, 'Library', 'Application Support', 'Google', 'Chrome')
+            browser_paths['chrome'] = self._find_chromium_history_files(chrome_path)
+            
+            # Brave
+            brave_path = os.path.join(home, 'Library', 'Application Support', 'BraveSoftware', 'Brave-Browser')
+            browser_paths['brave'] = self._find_chromium_history_files(brave_path)
+            
+            # Edge
+            edge_path = os.path.join(home, 'Library', 'Application Support', 'Microsoft Edge')
+            browser_paths['edge'] = self._find_chromium_history_files(edge_path)
+            
+            # Firefox
+            firefox_path = os.path.join(home, 'Library', 'Application Support', 'Firefox', 'Profiles')
+            browser_paths['firefox'] = self._find_firefox_history_files(firefox_path)
+            
+            # Safari
+            safari_history = os.path.join(home, 'Library', 'Safari', 'History.db')
+            if os.path.exists(safari_history):
+                browser_paths['safari'] = [safari_history]
+            else:
+                browser_paths['safari'] = []
+                
+        else:  # Linux
+            # Chrome
+            chrome_path = os.path.join(home, '.config', 'google-chrome')
+            browser_paths['chrome'] = self._find_chromium_history_files(chrome_path)
+            
+            # Brave
+            brave_path = os.path.join(home, '.config', 'BraveSoftware', 'Brave-Browser')
+            browser_paths['brave'] = self._find_chromium_history_files(brave_path)
+            
+            # Edge
+            edge_path = os.path.join(home, '.config', 'microsoft-edge')
+            browser_paths['edge'] = self._find_chromium_history_files(edge_path)
+            
+            # Firefox
+            firefox_path = os.path.join(home, '.mozilla', 'firefox')
+            browser_paths['firefox'] = self._find_firefox_history_files(firefox_path)
+            
+            # Safari is not available on Linux
+            browser_paths['safari'] = []
+            
+        return browser_paths
+        
+    def _find_chromium_history_files(self, base_path):
+        """Find Chromium-based browser history files
+        
+        This method finds history database files for Chromium-based browsers
+        (Chrome, Brave, Edge) by searching for 'History' files in profile directories.
+        
+        Args:
+            base_path (str): Base path to the browser's user data directory
+            
+        Returns:
+            list: A list of paths to history database files
+        """
+        history_files = []
+        
+        if not os.path.exists(base_path):
+            return history_files
+            
+        try:
+            # Look for profile directories (Default, Profile 1, Profile 2, etc.)
+            profiles = ['Default'] + [f'Profile {i}' for i in range(1, 10)]
+            
+            for profile in profiles:
+                profile_path = os.path.join(base_path, profile)
+                history_file = os.path.join(profile_path, 'History')
+                
+                if os.path.exists(history_file):
+                    history_files.append(history_file)
+        except Exception as e:
+            print(f"Error finding Chromium history files: {e}")
+            
+        return history_files
+        
+    def _find_firefox_history_files(self, profiles_path):
+        """Find Firefox history files
+        
+        This method finds history database files for Firefox by searching for
+        'places.sqlite' files in profile directories.
+        
+        Args:
+            profiles_path (str): Path to Firefox profiles directory
+            
+        Returns:
+            list: A list of paths to history database files
+        """
+        history_files = []
+        
+        if not os.path.exists(profiles_path):
+            return history_files
+            
+        try:
+            # Firefox profiles are in directories with random names
+            # Look for places.sqlite in each profile directory
+            for root, dirs, files in os.walk(profiles_path):
+                for file in files:
+                    if file == 'places.sqlite':
+                        history_files.append(os.path.join(root, file))
+        except Exception as e:
+            print(f"Error finding Firefox history files: {e}")
+            
+        return history_files
+        
+    def get_chrome_history(self, history_file, cutoff_time):
+        """Extract history from Chrome/Brave/Edge
+        
+        This method extracts recent browsing history from a Chromium-based browser's
+        history database file.
+        
+        Args:
+            history_file (str): Path to the history database file
+            cutoff_time (int): Unix timestamp for the cutoff time
+            
+        Returns:
+            list: A list of dictionaries containing URL, title, and visit time
+        """
+        history_data = []
+        
+        # Validate inputs
+        if not history_file or not os.path.exists(history_file):
+            print(f"Chrome history file does not exist: {history_file}")
+            return history_data
+            
+        # Ensure cutoff_time is valid
+        try:
+            cutoff_time = int(cutoff_time)
+        except (TypeError, ValueError):
+            print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
+            cutoff_time = int(time.time()) - 600
+            
+        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
+        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        
+        # Create a copy of the history file to avoid database lock issues
+        temp_dir = tempfile.gettempdir()
+        temp_history = os.path.join(temp_dir, f'temp_history_{random.randint(1000, 9999)}.db')
+        
+        try:
+            # Copy the history file to a temporary location
+            try:
+                shutil.copy2(history_file, temp_history)
+                print(f"Successfully copied Chrome history file: {history_file}")
+            except (shutil.Error, IOError) as e:
+                print(f"Error copying history file {history_file}: {e}")
+                return history_data
+            
+            # Connect to the database
+            try:
+                conn = sqlite3.connect(temp_history)
+                cursor = conn.cursor()
+                
+                # Query for recent history
+                # For long-term checks (first check after app starts), use a larger limit
+                # to ensure we capture more history entries
+                limit = 5000 if is_long_term_check else 1000
+                
+                # For long-term checks, also include visit count to prioritize frequently visited URLs
+                if is_long_term_check:
+                    query = """
+                    SELECT urls.url, urls.title, visits.visit_time, urls.visit_count
+                    FROM urls JOIN visits ON urls.id = visits.url
+                    WHERE visits.visit_time > ?
+                    ORDER BY visits.visit_time DESC, urls.visit_count DESC
+                    LIMIT ?
+                    """
+                    
+                    # Chrome stores time as microseconds since Jan 1, 1601 UTC
+                    # Convert from Unix timestamp to Chrome timestamp
+                    chrome_cutoff = (cutoff_time + 11644473600) * 1000000
+                    
+                    cursor.execute(query, (chrome_cutoff, limit))
+                    
+                    print(f"Executing Chrome history query with extended limit ({limit}) for long-term check")
+                    
+                    for url, title, visit_time, visit_count in cursor.fetchall():
+                        try:
+                            # Convert Chrome timestamp to Unix timestamp
+                            unix_time = visit_time // 1000000 - 11644473600
+                            
+                            # Skip invalid timestamps
+                            if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                continue
+                                
+                            # Format timestamp as ISO string
+                            timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                            
+                            # Skip empty URLs
+                            if not url:
+                                continue
+                                
+                            history_data.append({
+                                'url': url,
+                                'title': title or url,
+                                'timestamp': timestamp,
+                                'visit_time': unix_time,
+                                'visit_count': visit_count
+                            })
+                        except Exception as entry_error:
+                            print(f"Error processing Chrome history entry: {entry_error}")
+                            continue
+                else:
+                    # Regular query for short-term checks
+                    query = """
+                    SELECT urls.url, urls.title, visits.visit_time
+                    FROM urls JOIN visits ON urls.id = visits.url
+                    WHERE visits.visit_time > ?
+                    ORDER BY visits.visit_time DESC
+                    LIMIT ?
+                    """
+                    
+                    # Chrome stores time as microseconds since Jan 1, 1601 UTC
+                    # Convert from Unix timestamp to Chrome timestamp
+                    chrome_cutoff = (cutoff_time + 11644473600) * 1000000
+                    
+                    cursor.execute(query, (chrome_cutoff, limit))
+                    
+                    for url, title, visit_time in cursor.fetchall():
+                        try:
+                            # Convert Chrome timestamp to Unix timestamp
+                            unix_time = visit_time // 1000000 - 11644473600
+                            
+                            # Skip invalid timestamps
+                            if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                continue
+                                
+                            # Format timestamp as ISO string
+                            timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                            
+                            # Skip empty URLs
+                            if not url:
+                                continue
+                                
+                            history_data.append({
+                                'url': url,
+                                'title': title or url,
+                                'timestamp': timestamp,
+                                'visit_time': unix_time
+                            })
+                        except Exception as entry_error:
+                            print(f"Error processing Chrome history entry: {entry_error}")
+                            continue
+                
+                print(f"Found {len(history_data)} Chrome history entries from {os.path.basename(history_file)}")
+                conn.close()
+            except sqlite3.Error as sql_error:
+                print(f"SQLite error when reading Chrome history: {sql_error}")
+                return history_data
+        except Exception as e:
+            print(f"Error extracting Chrome history: {e}")
+        finally:
+            # Clean up the temporary file
+            try:
+                if os.path.exists(temp_history):
+                    os.remove(temp_history)
+            except Exception as cleanup_error:
+                print(f"Error cleaning up temporary Chrome history file: {cleanup_error}")
+                pass
+                
+        return history_data
+        
+    def get_firefox_history(self, history_file, cutoff_time):
+        """Extract history from Firefox
+        
+        This method extracts recent browsing history from a Firefox history database file.
+        
+        Args:
+            history_file (str): Path to the history database file
+            cutoff_time (int): Unix timestamp for the cutoff time
+            
+        Returns:
+            list: A list of dictionaries containing URL, title, and visit time
+        """
+        history_data = []
+        
+        # Validate inputs
+        if not history_file or not os.path.exists(history_file):
+            print(f"Firefox history file does not exist: {history_file}")
+            return history_data
+            
+        # Ensure cutoff_time is valid
+        try:
+            cutoff_time = int(cutoff_time)
+        except (TypeError, ValueError):
+            print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
+            cutoff_time = int(time.time()) - 600
+            
+        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
+        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        
+        # Create a copy of the history file to avoid database lock issues
+        temp_dir = tempfile.gettempdir()
+        temp_history = os.path.join(temp_dir, f'temp_history_{random.randint(1000, 9999)}.db')
+        
+        try:
+            # Copy the history file to a temporary location
+            try:
+                shutil.copy2(history_file, temp_history)
+                print(f"Successfully copied Firefox history file: {history_file}")
+            except (shutil.Error, IOError) as e:
+                print(f"Error copying Firefox history file {history_file}: {e}")
+                return history_data
+            
+            # Connect to the database
+            try:
+                conn = sqlite3.connect(temp_history)
+                cursor = conn.cursor()
+                
+                # Query for recent history
+                # For long-term checks (first check after app starts), use a larger limit
+                # to ensure we capture more history entries
+                limit = 5000 if is_long_term_check else 1000
+                
+                # For long-term checks, also include visit count to prioritize frequently visited URLs
+                if is_long_term_check:
+                    query = """
+                    SELECT p.url, p.title, h.visit_date, p.visit_count
+                    FROM moz_places p JOIN moz_historyvisits h ON p.id = h.place_id
+                    WHERE h.visit_date > ?
+                    ORDER BY h.visit_date DESC, p.visit_count DESC
+                    LIMIT ?
+                    """
+                    
+                    # Firefox stores time as microseconds since Jan 1, 1970 UTC
+                    firefox_cutoff = cutoff_time * 1000000
+                    
+                    cursor.execute(query, (firefox_cutoff, limit))
+                    
+                    print(f"Executing Firefox history query with extended limit ({limit}) for long-term check")
+                    
+                    for url, title, visit_time, visit_count in cursor.fetchall():
+                        try:
+                            # Convert Firefox timestamp to Unix timestamp
+                            unix_time = visit_time // 1000000
+                            
+                            # Skip invalid timestamps
+                            if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                continue
+                                
+                            # Format timestamp as ISO string
+                            timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                            
+                            # Skip empty URLs
+                            if not url:
+                                continue
+                                
+                            history_data.append({
+                                'url': url,
+                                'title': title or url,
+                                'timestamp': timestamp,
+                                'visit_time': unix_time,
+                                'visit_count': visit_count
+                            })
+                        except Exception as entry_error:
+                            print(f"Error processing Firefox history entry: {entry_error}")
+                            continue
+                else:
+                    # Regular query for short-term checks
+                    query = """
+                    SELECT p.url, p.title, h.visit_date
+                    FROM moz_places p JOIN moz_historyvisits h ON p.id = h.place_id
+                    WHERE h.visit_date > ?
+                    ORDER BY h.visit_date DESC
+                    LIMIT ?
+                    """
+                    
+                    # Firefox stores time as microseconds since Jan 1, 1970 UTC
+                    firefox_cutoff = cutoff_time * 1000000
+                    
+                    cursor.execute(query, (firefox_cutoff, limit))
+                    
+                    for url, title, visit_time in cursor.fetchall():
+                        try:
+                            # Convert Firefox timestamp to Unix timestamp
+                            unix_time = visit_time // 1000000
+                            
+                            # Skip invalid timestamps
+                            if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                continue
+                                
+                            # Format timestamp as ISO string
+                            timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                            
+                            # Skip empty URLs
+                            if not url:
+                                continue
+                                
+                            history_data.append({
+                                'url': url,
+                                'title': title or url,
+                                'timestamp': timestamp,
+                                'visit_time': unix_time
+                            })
+                        except Exception as entry_error:
+                            print(f"Error processing Firefox history entry: {entry_error}")
+                            continue
+                
+                print(f"Found {len(history_data)} Firefox history entries from {os.path.basename(os.path.dirname(history_file))}")
+                conn.close()
+            except sqlite3.Error as sql_error:
+                print(f"SQLite error when reading Firefox history: {sql_error}")
+                return history_data
+        except Exception as e:
+            print(f"Error extracting Firefox history: {e}")
+        finally:
+            # Clean up the temporary file
+            try:
+                if os.path.exists(temp_history):
+                    os.remove(temp_history)
+            except Exception as cleanup_error:
+                print(f"Error cleaning up temporary Firefox history file: {cleanup_error}")
+                pass
+                
+        return history_data
+        
+    def get_safari_history(self, history_file, cutoff_time):
+        """Extract history from Safari
+        
+        This method extracts recent browsing history from a Safari history database file.
+        
+        Args:
+            history_file (str): Path to the history database file
+            cutoff_time (int): Unix timestamp for the cutoff time
+            
+        Returns:
+            list: A list of dictionaries containing URL, title, and visit time
+        """
+        history_data = []
+        
+        # Validate inputs
+        if not history_file or not os.path.exists(history_file):
+            print(f"Safari history file does not exist: {history_file}")
+            return history_data
+            
+        # Ensure cutoff_time is valid
+        try:
+            cutoff_time = int(cutoff_time)
+        except (TypeError, ValueError):
+            print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
+            cutoff_time = int(time.time()) - 600
+            
+        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
+        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        
+        # Create a copy of the history file to avoid database lock issues
+        temp_dir = tempfile.gettempdir()
+        temp_history = os.path.join(temp_dir, f'temp_history_{random.randint(1000, 9999)}.db')
+        
+        try:
+            # Copy the history file to a temporary location
+            try:
+                shutil.copy2(history_file, temp_history)
+                print(f"Successfully copied Safari history file: {history_file}")
+            except (shutil.Error, IOError) as e:
+                print(f"Error copying Safari history file {history_file}: {e}")
+                return history_data
+            
+            # Connect to the database
+            try:
+                conn = sqlite3.connect(temp_history)
+                cursor = conn.cursor()
+                
+                # Query for recent history
+                # For long-term checks (first check after app starts), use a larger limit
+                # to ensure we capture more history entries
+                limit = 5000 if is_long_term_check else 1000
+                
+                # For long-term checks, also include visit count to prioritize frequently visited URLs
+                # Note: Safari schema might be different, so we need to adapt the query
+                try:
+                    # First, check if the visit_count column exists in the history_items table
+                    cursor.execute("PRAGMA table_info(history_items)")
+                    columns = [column[1] for column in cursor.fetchall()]
+                    has_visit_count = 'visit_count' in columns
+                    
+                    if is_long_term_check and has_visit_count:
+                        query = """
+                        SELECT i.url, v.title, v.visit_time, i.visit_count
+                        FROM history_items i JOIN history_visits v ON i.id = v.history_item
+                        WHERE v.visit_time > ?
+                        ORDER BY v.visit_time DESC, i.visit_count DESC
+                        LIMIT ?
+                        """
+                        
+                        # Safari stores time as seconds since Jan 1, 2001 UTC
+                        # Convert from Unix timestamp to Safari timestamp
+                        safari_cutoff = cutoff_time - 978307200
+                        
+                        cursor.execute(query, (safari_cutoff, limit))
+                        
+                        print(f"Executing Safari history query with extended limit ({limit}) for long-term check")
+                        
+                        for url, title, visit_time, visit_count in cursor.fetchall():
+                            try:
+                                # Convert Safari timestamp to Unix timestamp
+                                unix_time = visit_time + 978307200
+                                
+                                # Skip invalid timestamps
+                                if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                    continue
+                                    
+                                # Format timestamp as ISO string
+                                timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                                
+                                # Skip empty URLs
+                                if not url:
+                                    continue
+                                    
+                                history_data.append({
+                                    'url': url,
+                                    'title': title or url,
+                                    'timestamp': timestamp,
+                                    'visit_time': unix_time,
+                                    'visit_count': visit_count
+                                })
+                            except Exception as entry_error:
+                                print(f"Error processing Safari history entry: {entry_error}")
+                                continue
+                    else:
+                        # Regular query for short-term checks or if visit_count is not available
+                        query = """
+                        SELECT i.url, v.title, v.visit_time
+                        FROM history_items i JOIN history_visits v ON i.id = v.history_item
+                        WHERE v.visit_time > ?
+                        ORDER BY v.visit_time DESC
+                        LIMIT ?
+                        """
+                        
+                        # Safari stores time as seconds since Jan 1, 2001 UTC
+                        # Convert from Unix timestamp to Safari timestamp
+                        safari_cutoff = cutoff_time - 978307200
+                        
+                        cursor.execute(query, (safari_cutoff, limit))
+                        
+                        for url, title, visit_time in cursor.fetchall():
+                            try:
+                                # Convert Safari timestamp to Unix timestamp
+                                unix_time = visit_time + 978307200
+                                
+                                # Skip invalid timestamps
+                                if unix_time <= 0 or unix_time > time.time() + 86400:  # Allow 1 day in the future for clock skew
+                                    continue
+                                    
+                                # Format timestamp as ISO string
+                                timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                                
+                                # Skip empty URLs
+                                if not url:
+                                    continue
+                                    
+                                history_data.append({
+                                    'url': url,
+                                    'title': title or url,
+                                    'timestamp': timestamp,
+                                    'visit_time': unix_time
+                                })
+                            except Exception as entry_error:
+                                print(f"Error processing Safari history entry: {entry_error}")
+                                continue
+                except sqlite3.Error as schema_error:
+                    print(f"Error checking Safari schema: {schema_error}")
+                    # Fall back to basic query
+                    query = """
+                    SELECT i.url, v.title, v.visit_time
+                    FROM history_items i JOIN history_visits v ON i.id = v.history_item
+                    WHERE v.visit_time > ?
+                    ORDER BY v.visit_time DESC
+                    LIMIT ?
+                    """
+                    
+                    safari_cutoff = cutoff_time - 978307200
+                    cursor.execute(query, (safari_cutoff, limit))
+                    
+                    for url, title, visit_time in cursor.fetchall():
+                        try:
+                            unix_time = visit_time + 978307200
+                            if unix_time <= 0 or unix_time > time.time() + 86400:
+                                continue
+                            timestamp = datetime.fromtimestamp(unix_time, timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+                            if not url:
+                                continue
+                            history_data.append({
+                                'url': url,
+                                'title': title or url,
+                                'timestamp': timestamp,
+                                'visit_time': unix_time
+                            })
+                        except Exception as entry_error:
+                            print(f"Error processing Safari history entry: {entry_error}")
+                            continue
+                
+                print(f"Found {len(history_data)} Safari history entries")
+                conn.close()
+            except sqlite3.Error as sql_error:
+                print(f"SQLite error when reading Safari history: {sql_error}")
+                return history_data
+        except Exception as e:
+            print(f"Error extracting Safari history: {e}")
+        finally:
+            # Clean up the temporary file
+            try:
+                if os.path.exists(temp_history):
+                    os.remove(temp_history)
+            except Exception as cleanup_error:
+                print(f"Error cleaning up temporary Safari history file: {cleanup_error}")
+                pass
+                
+        return history_data
+        
+    def check_browser_links(self):
+        """Check browser links and update link usage data
+        
+        This method checks browser history for all supported browsers and updates
+        the link usage data with the time spent on each link.
+        
+        On the first check after the app starts (when last_link_check_time is None),
+        it uses a 24-hour window to capture existing browser history that might have
+        been created before the app was started. For subsequent checks, it uses the
+        regular session update interval (10 minutes) to capture only recent history.
+        
+        The method handles various edge cases and error conditions, such as missing
+        or corrupt history files, database lock issues, and invalid timestamps.
+        
+        Returns:
+            None
+        """
+        if not self.start_time:
+            return
+            
+        current_time = time.time()
+        
+        # If this is the first check, initialize last_link_check_time
+        first_check = self.last_link_check_time is None
+        if first_check:
+            self.last_link_check_time = current_time
+            
+        # Calculate time elapsed since last check
+        time_elapsed = current_time - self.last_link_check_time
+        self.last_link_check_time = current_time
+        
+        # Get current timestamp in ISO format
+        current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+        
+        # Calculate cutoff time
+        # For the first check, use a much longer window (24 hours) to capture existing browser history
+        # For subsequent checks, use the regular session update interval (10 minutes)
+        if first_check:
+            # Use 24 hours for the first check to capture existing browser history
+            cutoff_time = int(current_time) - (24 * 60 * 60)  # 24 hours in seconds
+            print(f"First browser history check - using 24-hour window to capture existing history")
+        else:
+            # Use regular session update interval for subsequent checks
+            cutoff_time = int(current_time) - self.session_update_interval
+        
+        try:
+            # Get browser paths
+            browser_paths = self.get_browser_paths()
+            
+            # Track the total number of history entries found
+            total_history_entries = 0
+            
+            # Process each browser type
+            for browser_type in self.supported_browsers:
+                history_files = browser_paths.get(browser_type, [])
+                
+                for history_file in history_files:
+                    try:
+                        # Get history data based on browser type
+                        if browser_type in ['chrome', 'brave', 'edge']:
+                            history_data = self.get_chrome_history(history_file, cutoff_time)
+                        elif browser_type == 'firefox':
+                            history_data = self.get_firefox_history(history_file, cutoff_time)
+                        elif browser_type == 'safari':
+                            history_data = self.get_safari_history(history_file, cutoff_time)
+                        else:
+                            continue
+                        
+                        # Update total history entries count
+                        total_history_entries += len(history_data)
+                        
+                        # Process history data
+                        for entry in history_data:
+                            url = entry['url']
+                            title = entry['title']
+                            
+                            # Skip about: and chrome:// URLs and other browser-specific URLs
+                            if url.startswith(('about:', 'chrome://', 'edge://', 'brave://', 'firefox://', 'safari://', 'file://', 'data:')):
+                                continue
+                                
+                            # Skip empty URLs or titles
+                            if not url or not title:
+                                continue
+                                
+                            # Normalize URL (remove trailing slashes, etc.)
+                            url = url.rstrip('/')
+                            
+                            # Update link usage data
+                            if url in self.links_usage:
+                                # Update existing link
+                                # Distribute time based on number of entries, but ensure at least 1 second per entry
+                                time_per_entry = max(1, time_elapsed / max(1, total_history_entries))
+                                self.links_usage[url]['timeSpent'] += time_per_entry
+                                self.links_usage[url]['lastSeen'] = current_timestamp
+                            else:
+                                # Add new link
+                                time_per_entry = max(1, time_elapsed / max(1, total_history_entries))
+                                self.links_usage[url] = {
+                                    'url': url,
+                                    'title': title,
+                                    'timeSpent': time_per_entry,
+                                    'lastSeen': current_timestamp
+                                }
+                    except Exception as e:
+                        # Log the error but continue processing other history files
+                        print(f"Error processing history file {history_file}: {e}")
+                        continue
+        except Exception as e:
+            print(f"Error checking browser links: {e}")
+            # Continue execution even if there's an error
+            
+    def start_link_tracking(self):
+        """Start the link tracking thread
+        
+        This method starts a periodic thread to check browser links and update
+        the link usage data. The thread runs every self.link_check_interval seconds.
+        """
+        # Don't start if already running
+        if self.link_timer:
+            return
+            
+        def link_check():
+            """Inner function to check browser links periodically"""
+            # Stop if timer is no longer running
+            if not self.start_time:
+                return
+                
+            try:
+                # Check browser links
+                self.check_browser_links()
+            except Exception as e:
+                # Log error but continue execution
+                print(f"Error in link check thread: {e}")
+            
+            # Schedule the next check if timer is still running
+            if self.start_time:
+                self.link_timer = threading.Timer(self.link_check_interval, link_check)
+                self.link_timer.daemon = True
+                self.link_timer.start()
+        
+        # Initialize link tracking
+        self.last_link_check_time = time.time()
+        
+        # Start the link check timer
+        self.link_timer = threading.Timer(self.link_check_interval, link_check)
+        self.link_timer.daemon = True
+        self.link_timer.start()
+        
+        print(f"Link tracking started with interval of {self.link_check_interval} seconds")
+    
+    def stop_link_tracking(self):
+        """Stop the link tracking thread
+        
+        This method stops the periodic thread that checks browser links.
+        """
+        if self.link_timer:
+            self.link_timer.cancel()
+            self.link_timer = None
+            print("Link tracking stopped")
+            
+    def prepare_links_for_session(self):
+        """Prepare link data for session updates
+        
+        This method converts the link usage data from the links_usage
+        dictionary to the format required by the API.
+        
+        It includes several robustness features:
+        - Checks for empty links_usage and attempts to force a browser history check if needed
+        - Tracks metrics for debugging (total links, valid links, skipped links, error links)
+        - Prioritizes links by timeSpent and visit_count (when available)
+        - Limits the number of links to prevent oversized payloads
+        - Provides detailed logging for troubleshooting
+        
+        If no valid links are found, it returns an empty list and logs a warning.
+        
+        Returns:
+            list: A list of link usage data in the format required by the API
+        """
+        links_data = []
+        
+        try:
+            # Get current timestamp in ISO format
+            current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            
+            # Check if links_usage is empty
+            if not self.links_usage:
+                print("Warning: links_usage is empty. No browser history data collected.")
+                # If this is the first check after app startup, try to collect browser history now
+                if self.last_link_check_time is not None and time.time() - self.last_link_check_time < 60:
+                    print("This appears to be soon after startup. Forcing a browser history check with 24-hour window...")
+                    # Force a browser history check with a 24-hour window
+                    self.last_link_check_time = None
+                    self.check_browser_links()
+            
+            # Track metrics for debugging
+            total_links = len(self.links_usage)
+            valid_links = 0
+            skipped_links = 0
+            error_links = 0
+            
+            # Convert links_usage dictionary to list of link usage data
+            for url, link_info in self.links_usage.items():
+                try:
+                    # Skip invalid entries
+                    if not url or not isinstance(link_info, dict):
+                        skipped_links += 1
+                        continue
+                        
+                    # Ensure required fields exist
+                    if 'title' not in link_info or 'timeSpent' not in link_info:
+                        skipped_links += 1
+                        continue
+                        
+                    # Only include links with significant usage (more than 1 second)
+                    if link_info['timeSpent'] > 1:
+                        # Ensure title is a string
+                        title = str(link_info['title']) if link_info['title'] else url
+                        
+                        # Limit title and URL length to prevent oversized payloads
+                        title = title[:255]  # Limit title to 255 characters
+                        url_to_send = url[:2048]  # Limit URL to 2048 characters
+                        
+                        # Add visit_count if available (for prioritization)
+                        link_data = {
+                            'url': url_to_send,
+                            'title': title,
+                            'timeSpent': int(link_info['timeSpent']),  # Convert to integer
+                            'timestamp': link_info['lastSeen'] if 'lastSeen' in link_info else current_timestamp
+                        }
+                        
+                        # Add visit_count if available
+                        if 'visit_count' in link_info:
+                            link_data['visit_count'] = link_info['visit_count']
+                        
+                        links_data.append(link_data)
+                        valid_links += 1
+                    else:
+                        skipped_links += 1
+                except Exception as e:
+                    print(f"Error processing link {url}: {e}")
+                    error_links += 1
+                    continue
+            
+            # Log metrics
+            print(f"Links processing metrics: Total={total_links}, Valid={valid_links}, Skipped={skipped_links}, Errors={error_links}")
+            
+            # Sort by timeSpent in descending order
+            links_data.sort(key=lambda x: x['timeSpent'], reverse=True)
+            
+            # If we have visit_count, use it as a secondary sort key
+            if any('visit_count' in link for link in links_data):
+                links_data.sort(key=lambda x: (x['timeSpent'], x.get('visit_count', 0)), reverse=True)
+            
+            # Limit the number of links to prevent oversized payloads
+            max_links = 100  # Limit to 100 links per session update
+            if len(links_data) > max_links:
+                print(f"Warning: Limiting links from {len(links_data)} to {max_links} to prevent oversized payloads")
+                links_data = links_data[:max_links]
+            
+            # If we still have no links, log a warning
+            if not links_data:
+                print("Warning: No valid links found for session update. Check browser history access.")
+                
+        except Exception as e:
+            print(f"Error preparing links for session: {e}")
+            # Return an empty list if there's an error
+            return []
+            
+        return links_data
     
     def get_daily_stats(self):
         """Get daily stats for the current employee"""
