@@ -6,6 +6,16 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import useAxiosSecure from "./hooks/useAxiosSecure.jsx";
 import {QueryClient, QueryClientProvider, useQuery} from "@tanstack/react-query";
 import logo from "/icon.ico";
+import { Toaster, toast } from 'sonner'
+
+
+// Expose to Python
+window.toastFromPython = (msg, type = "info") => {
+    if (type === "success") toast.success(msg);
+    else if (type === "error") toast.error(msg);
+    else toast(msg);
+};
+
 
 // Compact CSS with modern animations and glassmorphism effects
 const compactStyles = `
@@ -422,6 +432,7 @@ function AppContent() {
 
                 setStatsLastUpdated(new Date());
             } catch (error) {
+                toast.error("Failed to get stats!");
                 console.error("Initial stats fetch error:", error);
             }
         };
@@ -980,6 +991,7 @@ export default function App() {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
+                <Toaster position="bottom-right" />
                 <AuthenticatedApp />
             </AuthProvider>
         </QueryClientProvider>

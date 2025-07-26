@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import {toast} from "sonner";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }) => {
             await window.pywebview.api.logout();
             setToken(null);
             setCurrentUser(null);
+            toast.success("Logged out successfully!");
         } catch (error) {
             console.error('Logout error:', error);
         }

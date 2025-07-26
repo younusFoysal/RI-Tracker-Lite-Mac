@@ -163,7 +163,7 @@ class Api:
                     # If not remembering, just set in memory but don't save to database
                     self.auth_token = token
                     self.user_data = user_data
-                    
+                window.evaluate_js('window.toastFromPython("Login successful!", "success")')
                 return {"success": True, "data": data['data']}
             else:
                 return {"success": False, "message": data.get('message', 'Login failed')}
@@ -889,6 +889,7 @@ class Api:
                 return {"success": False, "message": data.get('message', 'Failed to get daily stats')}
         except Exception as e:
             print(f"Daily stats error: {e}")
+            window.evaluate_js('window.toastFromPython("Failed to get daily stats!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def get_weekly_stats(self):
