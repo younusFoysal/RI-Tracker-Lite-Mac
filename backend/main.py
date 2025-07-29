@@ -202,7 +202,7 @@ class Api:
                 return {"success": False, "message": "Employee ID not found"}
                 
             response = requests.get(
-                f'{URLS['PROFILE']}/{employee_id}',
+                f"{URLS['PROFILE']}/{employee_id}",
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
