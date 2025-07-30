@@ -716,7 +716,7 @@ function AppContent() {
     // App constants
     const appIcon = logo;
     const appName = "RI Tracker";
-    const appVersion = "1.0.11";
+    const appVersion = "1.0.12";
 
     return (
         <div className="app-container gradient-bg">
@@ -882,13 +882,34 @@ function AppContent() {
                                                         setStatsLastUpdated(new Date());
                                                     }
                                                 } else {
+                                                    // Even if the backend call fails, reset the timer state in the UI
+                                                    // This ensures the timer visually stops for the user
+                                                    setSessionInfo(null);
+                                                    setIsRunning(false);
+                                                    setTime(0);
+                                                    
+                                                    // Show error message
                                                     setTimerError(result.message || "Failed to stop timer");
                                                     console.error("Timer stop error:", result.message);
+                                                    
+                                                    // Show toast notification
+                                                    toast.error("Timer stopped with errors. Some data may not have been saved.");
                                                 }
                                             }
                                         } catch (error) {
                                             console.error("Timer operation error:", error);
-                                            setTimerError("An error occurred during timer operation");
+                                            
+                                            // If this was a stop timer operation, ensure the timer is stopped in the UI
+                                            // even if an exception occurred
+                                            if (isRunning) {
+                                                setSessionInfo(null);
+                                                setIsRunning(false);
+                                                setTime(0);
+                                                setTimerError("Failed to stop timer, but timer has been stopped locally");
+                                                toast.error("Timer stopped with errors. Some data may not have been saved.");
+                                            } else {
+                                                setTimerError("An error occurred during timer operation");
+                                            }
                                         } finally {
                                             setIsTimerOperationPending(false);
                                         }
@@ -911,7 +932,7 @@ function AppContent() {
                                     )}
                                 </button>
                                 {timerError && (
-                                    <div className="absolute top-full right-0 mt-2">
+                                    <div className="absolute top-full right-0 mt-2 z-40">
                                         <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-2 py-1 rounded-lg max-w-32">
                                             {timerError}
                                         </div>

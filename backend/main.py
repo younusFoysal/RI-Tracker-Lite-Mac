@@ -32,7 +32,7 @@ except ImportError:
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.11"  # Current version of the application
+APP_VERSION = "1.0.12"  # Current version of the application
 # GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Releases"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
@@ -382,14 +382,16 @@ class Api:
             }
             print(f"Update Session: {update_data}")
             
-            # Send request to update session
+            # Send request to update session with timeout
+            # Use a 30-second timeout to prevent hanging for long-running sessions
             response = requests.patch(
                 f'{URLS["SESSIONS"]}/{self.session_id}',
                 json=update_data,
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
-                }
+                },
+                timeout=30  # 30 second timeout
             )
             
             data = response.json()
@@ -401,8 +403,29 @@ class Api:
                 return {"success": True, "data": data['data']}
             else:
                 return {"success": False, "message": data.get('message', 'Failed to update session')}
+        except requests.exceptions.Timeout:
+            print("Update session timeout: Request timed out after 30 seconds")
+            # For final updates, we should still consider the timer stopped locally
+            if is_final_update:
+                self.session_id = None
+            return {"success": False, "message": "Request timed out. The server took too long to respond."}
+        except requests.exceptions.ConnectionError:
+            print("Update session connection error: Failed to connect to the server")
+            # For final updates, we should still consider the timer stopped locally
+            if is_final_update:
+                self.session_id = None
+            return {"success": False, "message": "Connection error. Failed to connect to the server."}
+        except requests.exceptions.RequestException as e:
+            print(f"Update session request error: {e}")
+            # For final updates, we should still consider the timer stopped locally
+            if is_final_update:
+                self.session_id = None
+            return {"success": False, "message": f"Request error: {str(e)}"}
         except Exception as e:
             print(f"Update session error: {e}")
+            # For final updates, we should still consider the timer stopped locally
+            if is_final_update:
+                self.session_id = None
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def start_stats_updates(self):
