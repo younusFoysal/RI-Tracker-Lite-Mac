@@ -21,6 +21,14 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from config import URLS
 
+# Import pynput for system-wide keyboard and mouse tracking
+try:
+    from pynput import keyboard, mouse
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    print("pynput library not available. System-wide activity tracking will be disabled.")
+    PYNPUT_AVAILABLE = False
+
 
 APP_NAME = "RI_Tracker"
 APP_VERSION = "1.0.10"  # Current version of the application
@@ -76,6 +84,11 @@ class Api:
         self.activity_timer = None
         self.activity_check_interval = 1  # seconds between activity checks
         self.last_active_check_time = None
+        
+        # System-wide activity tracking variables (pynput)
+        self.keyboard_listener = None
+        self.mouse_listener = None
+        self.system_tracking_enabled = PYNPUT_AVAILABLE
         
         # Stats update variables
         self.stats_timer = None
@@ -882,7 +895,7 @@ class Api:
             self.mouse_activity_rate = int(self.mouse_events / minutes) if minutes > 0 else 0
     
     def start_activity_tracking(self):
-        """Start the activity tracking thread"""
+        """Start the activity tracking thread and system-wide input listeners"""
         if self.activity_timer:
             return
             
@@ -904,16 +917,56 @@ class Api:
         self.last_active_check_time = self.last_activity_time
         self.is_idle = False
         
+        # Start system-wide input listeners if enabled
+        if self.system_tracking_enabled:
+            try:
+                # Start keyboard listener
+                self.keyboard_listener = keyboard.Listener(
+                    on_press=self.on_keyboard_event,
+                    on_release=None
+                )
+                self.keyboard_listener.daemon = True
+                self.keyboard_listener.start()
+                
+                # Start mouse listener
+                self.mouse_listener = mouse.Listener(
+                    on_move=self.on_mouse_event,
+                    on_click=self.on_mouse_event,
+                    on_scroll=self.on_mouse_event
+                )
+                self.mouse_listener.daemon = True
+                self.mouse_listener.start()
+                
+                print("System-wide activity tracking started")
+            except Exception as e:
+                print(f"Error starting system-wide activity tracking: {e}")
+                self.system_tracking_enabled = False
+        
         # Start the activity check timer
         self.activity_timer = threading.Timer(self.activity_check_interval, activity_check)
         self.activity_timer.daemon = True
         self.activity_timer.start()
     
     def stop_activity_tracking(self):
-        """Stop the activity tracking thread"""
+        """Stop the activity tracking thread and system-wide input listeners"""
         if self.activity_timer:
             self.activity_timer.cancel()
             self.activity_timer = None
+        
+        # Stop system-wide input listeners
+        if self.system_tracking_enabled:
+            try:
+                if self.keyboard_listener:
+                    self.keyboard_listener.stop()
+                    self.keyboard_listener = None
+                
+                if self.mouse_listener:
+                    self.mouse_listener.stop()
+                    self.mouse_listener = None
+                
+                print("System-wide activity tracking stopped")
+            except Exception as e:
+                print(f"Error stopping system-wide activity tracking: {e}")
     
     def record_keyboard_activity(self):
         """JavaScript interface method to record keyboard activity"""
@@ -928,6 +981,17 @@ class Api:
             self.record_activity('mouse')
             return {"success": True}
         return {"success": False, "message": "Timer not running"}
+    
+    # System-wide activity tracking callback functions for pynput
+    def on_keyboard_event(self, *args):
+        """Callback function for keyboard events from pynput"""
+        if self.start_time:
+            self.record_activity('keyboard')
+    
+    def on_mouse_event(self, *args):
+        """Callback function for mouse events from pynput"""
+        if self.start_time:
+            self.record_activity('mouse')
     
     def get_activity_stats(self):
         """Get current activity statistics"""
