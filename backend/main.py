@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from config import URLS
+import screeninfo
 
 # Import pynput for system-wide keyboard and mouse tracking
 try:
@@ -31,7 +32,7 @@ except ImportError:
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.10"  # Current version of the application
+APP_VERSION = "1.0.11"  # Current version of the application
 # GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Releases"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
@@ -2280,14 +2281,24 @@ if __name__ == '__main__':
         debug = False
         print("Running in PRODUCTION mode")
 
+    # Get primary monitor size
+    monitor = screeninfo.get_monitors()[0]
+    screen_width = monitor.width
+    screen_height = monitor.height
+
+    # Set window size relative to screen size
+    win_width = min(400, screen_width + 50)
+    win_height = min(630, screen_height + 100)
+
     # Create the window
     window = webview.create_window(
         "RI Tracker",
         url,
         js_api=api,
-        width=400,
-        height=630,
-        resizable=False
+        width=win_width,
+        height=win_height,
+        min_size=(300, 400),
+        resizable=False,
     )
 
     # Start the application
