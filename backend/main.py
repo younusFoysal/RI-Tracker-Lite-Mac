@@ -1030,6 +1030,25 @@ class Api:
         # Get current timestamp in ISO format
         current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         
+        # Define system process patterns to exclude
+        system_process_names = [
+            'System', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 
+            'services.exe', 'lsass.exe', 'svchost.exe', 'winlogon.exe', 
+            'dwm.exe', 'conhost.exe', 'dllhost.exe', 'taskhostw.exe',
+            'explorer.exe', 'RuntimeBroker.exe', 'ShellExperienceHost.exe',
+            'SearchUI.exe', 'sihost.exe', 'ctfmon.exe', 'WmiPrvSE.exe',
+            'spoolsv.exe', 'SearchIndexer.exe', 'fontdrvhost.exe',
+            'WUDFHost.exe', 'LsaIso.exe', 'SgrmBroker.exe', 'audiodg.exe',
+            'dasHost.exe', 'SearchProtocolHost.exe', 'SearchFilterHost.exe'
+        ]
+        
+        # System directories patterns
+        system_dirs = [
+            '\\Windows\\', '\\Windows\\System32\\', '\\Windows\\SysWOW64\\',
+            '\\Windows\\WinSxS\\', '\\Windows\\servicing\\', '\\ProgramData\\',
+            '\\Program Files\\Common Files\\', '\\Program Files (x86)\\Common Files\\'
+        ]
+        
         # Get list of running processes
         try:
             # Get all running processes
@@ -1040,18 +1059,27 @@ class Api:
                     # Get process info
                     proc_info = proc.info
                     
-                    # Skip system processes and processes without a name
+                    # Skip processes without a name or executable
                     if not proc_info['name'] or not proc_info['exe']:
                         continue
-                        
+                    
                     # Use the executable name as the app name
                     app_name = os.path.basename(proc_info['exe'])
+                    exe_path = proc_info['exe']
+                    
+                    # Skip system processes based on name
+                    if app_name.lower() in [p.lower() for p in system_process_names]:
+                        continue
+                    
+                    # Skip system processes based on path
+                    if any(system_dir.lower() in exe_path.lower() for system_dir in system_dirs):
+                        continue
                     
                     # Add to active apps
                     if app_name not in active_apps:
                         active_apps[app_name] = {
                             'name': app_name,
-                            'exe': proc_info['exe']
+                            'exe': exe_path
                         }
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
