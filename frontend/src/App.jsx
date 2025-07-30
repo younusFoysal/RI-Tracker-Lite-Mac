@@ -577,9 +577,22 @@ function AppContent() {
                 window.pywebview.api.record_mouse_activity();
             };
 
+            // Sync timer with backend when window regains focus
+            const handleWindowFocus = async () => {
+                try {
+                    const result = await window.pywebview.api.get_current_session_time();
+                    if (result.success) {
+                        setTime(result.elapsed_time);
+                    }
+                } catch (error) {
+                    console.error("Error syncing timer on focus:", error);
+                }
+            };
+
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('click', handleMouseClick);
+            window.addEventListener('focus', handleWindowFocus);
 
             window.pywebview.api.record_mouse_activity();
 
@@ -588,6 +601,7 @@ function AppContent() {
                 window.removeEventListener('keydown', handleKeyDown);
                 window.removeEventListener('mousemove', handleMouseMove);
                 window.removeEventListener('click', handleMouseClick);
+                window.removeEventListener('focus', handleWindowFocus);
             };
         } else {
             clearInterval(interval);
@@ -653,7 +667,7 @@ function AppContent() {
     // App constants
     const appIcon = logo;
     const appName = "RI Tracker";
-    const appVersion = "1.0.9";
+    const appVersion = "1.0.10";
 
     return (
         <div className="app-container gradient-bg">

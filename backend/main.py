@@ -23,8 +23,9 @@ from config import URLS
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.9"  # Current version of the application
-GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
+APP_VERSION = "1.0.10"  # Current version of the application
+# GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
+GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Releases"
 DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
 # Ensure the directory exists
@@ -232,6 +233,23 @@ class Api:
         if self.user_data:
             return {"success": True, "user": self.user_data}
         return {"success": False, "message": "No user data available"}
+        
+    def get_current_session_time(self):
+        """Get the current elapsed time for the active session in seconds"""
+        if self.start_time is None:
+            return {
+                "success": False,
+                "message": "No active session",
+                "elapsed_time": 0
+            }
+        
+        current_time = time.time()
+        elapsed_time = int(current_time - self.start_time)
+        
+        return {
+            "success": True,
+            "elapsed_time": elapsed_time
+        }
 
     def create_session(self):
         """Create a new session via API"""
