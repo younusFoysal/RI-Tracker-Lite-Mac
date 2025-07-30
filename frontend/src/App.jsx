@@ -560,6 +560,8 @@ function AppContent() {
     // Effect to handle the timer logic
     useEffect(() => {
         let interval = null;
+        let visibilityHiddenTimestamp = null;
+        
         if (isRunning) {
             interval = setInterval(() => {
                 setTime(prevTime => prevTime + 1);
@@ -588,11 +590,57 @@ function AppContent() {
                     console.error("Error syncing timer on focus:", error);
                 }
             };
+            
+            // Handle visibility change (for sleep mode detection)
+            const handleVisibilityChange = async () => {
+                if (document.visibilityState === 'hidden') {
+                    // Page is hidden (could be tab switch or sleep mode)
+                    visibilityHiddenTimestamp = new Date();
+                } else if (document.visibilityState === 'visible' && visibilityHiddenTimestamp) {
+                    // Page is visible again after being hidden
+                    const hiddenDuration = new Date() - visibilityHiddenTimestamp;
+                    const SLEEP_THRESHOLD_MS = 30000; // 30 seconds threshold to consider it sleep mode
+                    
+                    if (hiddenDuration > SLEEP_THRESHOLD_MS) {
+                        // Device was likely in sleep mode, stop the timer
+                        try {
+                            console.log("Device was in sleep mode for", hiddenDuration / 1000, "seconds. Stopping timer.");
+                            toast.info("Timer stopped due to device sleep mode");
+                            
+                            const result = await window.pywebview.api.stop_timer();
+                            if (result.success) {
+                                setSessionInfo(null);
+                                setIsRunning(false);
+                                setTime(0);
+
+                                if (result.stats) {
+                                    if (result.stats.daily && result.stats.daily.success) {
+                                        setDailyStats(result.stats.daily.data);
+                                    }
+                                    if (result.stats.weekly && result.stats.weekly.success) {
+                                        setWeeklyStats(result.stats.weekly.data);
+                                    }
+                                    setStatsLastUpdated(new Date());
+                                }
+                            } else {
+                                setTimerError(result.message || "Failed to stop timer after sleep mode");
+                                console.error("Timer stop error after sleep mode:", result.message);
+                            }
+                        } catch (error) {
+                            console.error("Error stopping timer after sleep mode:", error);
+                            setTimerError("An error occurred while stopping timer after sleep mode");
+                        }
+                    }
+                    
+                    visibilityHiddenTimestamp = null;
+                }
+            };
 
             window.addEventListener('keydown', handleKeyDown);
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('click', handleMouseClick);
             window.addEventListener('focus', handleWindowFocus);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
 
             window.pywebview.api.record_mouse_activity();
 
@@ -602,6 +650,7 @@ function AppContent() {
                 window.removeEventListener('mousemove', handleMouseMove);
                 window.removeEventListener('click', handleMouseClick);
                 window.removeEventListener('focus', handleWindowFocus);
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
             };
         } else {
             clearInterval(interval);
@@ -721,14 +770,22 @@ function AppContent() {
                                         View Profile
                                     </button>
                                     <button
-                                        className="block w-full text-left px-3 py-2 text-sm  text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center gap-2"
+                                        className={`block w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                                            isRunning 
+                                            ? 'text-red-300 cursor-not-allowed' 
+                                            : 'text-red-600 hover:bg-red-50 transition-colors duration-200'
+                                        }`}
                                         onClick={() => {
-                                            logout();
-                                            setShowDropdown(false);
+                                            if (!isRunning) {
+                                                logout();
+                                                setShowDropdown(false);
+                                            }
                                         }}
+                                        disabled={isRunning}
+                                        title={isRunning ? "Stop the timer before logging out" : "Logout"}
                                     >
                                         <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                                        Logout
+                                        Logout {isRunning && "(Disabled while timer is running)"}
                                     </button>
                                 </div>
                             )}
