@@ -9,7 +9,17 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('dist', 'dist')],
-    hiddenimports=[],
+    hiddenimports=[
+        'requests', 'urllib3', 'chardet', 'certifi', 'idna',  # requests and its dependencies
+        'psutil',
+        'pynput', 'pynput.keyboard', 'pynput.mouse',  # pynput and its modules
+        'mss', 'mss.tools',
+        'screeninfo',
+        'webview', 'webview.platforms.winforms',  # webview and Windows-specific platform
+        'sqlite3',
+        'json', 'threading', 'subprocess', 'platform', 'shutil', 'random', 'tempfile', 'base64',
+        'glob', 're', 'pathlib', 'datetime',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
