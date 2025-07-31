@@ -391,7 +391,7 @@ class Api:
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
                 },
-                timeout=30  # 30 second timeout
+                # timeout=30  # 30 second timeout
             )
             
             data = response.json()
@@ -403,29 +403,29 @@ class Api:
                 return {"success": True, "data": data['data']}
             else:
                 return {"success": False, "message": data.get('message', 'Failed to update session')}
-        except requests.exceptions.Timeout:
-            print("Update session timeout: Request timed out after 30 seconds")
-            # For final updates, we should still consider the timer stopped locally
-            if is_final_update:
-                self.session_id = None
-            return {"success": False, "message": "Request timed out. The server took too long to respond."}
-        except requests.exceptions.ConnectionError:
-            print("Update session connection error: Failed to connect to the server")
-            # For final updates, we should still consider the timer stopped locally
-            if is_final_update:
-                self.session_id = None
-            return {"success": False, "message": "Connection error. Failed to connect to the server."}
-        except requests.exceptions.RequestException as e:
-            print(f"Update session request error: {e}")
-            # For final updates, we should still consider the timer stopped locally
-            if is_final_update:
-                self.session_id = None
-            return {"success": False, "message": f"Request error: {str(e)}"}
+        # except requests.exceptions.Timeout:
+        #     print("Update session timeout: Request timed out after 30 seconds")
+        #     # For final updates, we should still consider the timer stopped locally
+        #     if is_final_update:
+        #         self.session_id = None
+        #     return {"success": False, "message": "Request timed out. The server took too long to respond."}
+        # except requests.exceptions.ConnectionError:
+        #     print("Update session connection error: Failed to connect to the server")
+        #     # For final updates, we should still consider the timer stopped locally
+        #     if is_final_update:
+        #         self.session_id = None
+        #     return {"success": False, "message": "Connection error. Failed to connect to the server."}
+        # except requests.exceptions.RequestException as e:
+        #     print(f"Update session request error: {e}")
+        #     # For final updates, we should still consider the timer stopped locally
+        #     if is_final_update:
+        #         self.session_id = None
+        #     return {"success": False, "message": f"Request error: {str(e)}"}
         except Exception as e:
             print(f"Update session error: {e}")
             # For final updates, we should still consider the timer stopped locally
-            if is_final_update:
-                self.session_id = None
+            # if is_final_update:
+            #     self.session_id = None
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def start_stats_updates(self):

@@ -884,9 +884,9 @@ function AppContent() {
                                                 } else {
                                                     // Even if the backend call fails, reset the timer state in the UI
                                                     // This ensures the timer visually stops for the user
-                                                    setSessionInfo(null);
-                                                    setIsRunning(false);
-                                                    setTime(0);
+                                                    // setSessionInfo(null);
+                                                    // setIsRunning(false);
+                                                    // setTime(0);
                                                     
                                                     // Show error message
                                                     setTimerError(result.message || "Failed to stop timer");
@@ -902,9 +902,9 @@ function AppContent() {
                                             // If this was a stop timer operation, ensure the timer is stopped in the UI
                                             // even if an exception occurred
                                             if (isRunning) {
-                                                setSessionInfo(null);
-                                                setIsRunning(false);
-                                                setTime(0);
+                                                // setSessionInfo(null);
+                                                // setIsRunning(false);
+                                                // setTime(0);
                                                 setTimerError("Failed to stop timer, but timer has been stopped locally");
                                                 toast.error("Timer stopped with errors. Some data may not have been saved.");
                                             } else {
@@ -932,7 +932,7 @@ function AppContent() {
                                     )}
                                 </button>
                                 {timerError && (
-                                    <div className="absolute top-full right-0 mt-2 z-40">
+                                    <div className="absolute top-full right-0 mt-2 z-50">
                                         <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-2 py-1 rounded-lg max-w-32">
                                             {timerError}
                                         </div>
