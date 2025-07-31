@@ -1034,14 +1034,44 @@ class Api:
     def record_keyboard_activity(self):
         """JavaScript interface method to record keyboard activity"""
         if self.start_time:
-            self.record_activity('keyboard')
+            # Ensure keyboard events are recorded even when system-wide tracking is disabled
+            current_time = time.time()
+            self.last_activity_time = current_time
+            
+            # If user was idle, add the idle time
+            if self.is_idle and self.last_active_check_time is not None:
+                idle_duration = current_time - self.last_active_check_time
+                self.idle_time += idle_duration
+                self.is_idle = False
+            
+            # Only count keyboard events if enough time has passed since the last one
+            if current_time - self.last_keyboard_event_time >= self.event_throttle_interval:
+                self.keyboard_events += 1
+                self.last_keyboard_event_time = current_time
+                print(f"Keyboard event recorded. Total keyboard events: {self.keyboard_events}")
+            
             return {"success": True}
         return {"success": False, "message": "Timer not running"}
     
     def record_mouse_activity(self):
         """JavaScript interface method to record mouse activity"""
         if self.start_time:
-            self.record_activity('mouse')
+            # Ensure mouse events are recorded even when system-wide tracking is disabled
+            current_time = time.time()
+            self.last_activity_time = current_time
+            
+            # If user was idle, add the idle time
+            if self.is_idle and self.last_active_check_time is not None:
+                idle_duration = current_time - self.last_active_check_time
+                self.idle_time += idle_duration
+                self.is_idle = False
+            
+            # Only count mouse events if enough time has passed since the last one
+            if current_time - self.last_mouse_event_time >= self.event_throttle_interval:
+                self.mouse_events += 1
+                self.last_mouse_event_time = current_time
+                print(f"Mouse event recorded. Total mouse events: {self.mouse_events}")
+            
             return {"success": True}
         return {"success": False, "message": "Timer not running"}
     
@@ -1182,6 +1212,7 @@ class Api:
         
         # Define system process patterns to exclude
         system_process_names = [
+            # Windows system processes
             'System', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 
             'services.exe', 'lsass.exe', 'svchost.exe', 'winlogon.exe', 
             'dwm.exe', 'conhost.exe', 'dllhost.exe', 'taskhostw.exe',
@@ -1189,14 +1220,35 @@ class Api:
             'SearchUI.exe', 'sihost.exe', 'ctfmon.exe', 'WmiPrvSE.exe',
             'spoolsv.exe', 'SearchIndexer.exe', 'fontdrvhost.exe',
             'WUDFHost.exe', 'LsaIso.exe', 'SgrmBroker.exe', 'audiodg.exe',
-            'dasHost.exe', 'SearchProtocolHost.exe', 'SearchFilterHost.exe'
+            'dasHost.exe', 'SearchProtocolHost.exe', 'SearchFilterHost.exe',
+            
+            # macOS system processes and applications
+            'launchd', 'kernel_task', 'WindowServer', 'loginwindow', 'SystemUIServer',
+            'Finder', 'Dock', 'Spotlight', 'ControlCenter', 'NotificationCenter',
+            'mds', 'mds_stores', 'mdworker', 'distnoted', 'cfprefsd', 'iconservicesd',
+            'secd', 'securityd', 'opendirectoryd', 'powerd', 'coreaudiod', 'syslogd',
+            'fseventsd', 'systemstats', 'configd', 'watchdogd', 'amfid', 'keybagd',
+            'softwareupdated', 'corespeechd', 'mediaremoted', 'endpointsecurityd',
+            'logd', 'smd', 'UserEventAgent', 'APFSUserAgent', 'AirPlayUIAgent',
+            'Safari', 'Mail', 'Calendar', 'Contacts', 'Notes', 'Photos', 'Messages',
+            'FaceTime', 'Maps', 'Music', 'AppStore', 'System Preferences', 'Terminal',
+            'Activity Monitor', 'Console', 'Keychain Access', 'Preview', 'TextEdit',
+            'Calculator', 'Chess', 'Dictionary', 'Books', 'FindMy', 'Home', 'News',
+            'Podcasts', 'Reminders', 'Stocks', 'TV', 'Voice Memos', 'Weather'
         ]
         
         # System directories patterns
         system_dirs = [
+            # Windows system directories
             '\\Windows\\', '\\Windows\\System32\\', '\\Windows\\SysWOW64\\',
             '\\Windows\\WinSxS\\', '\\Windows\\servicing\\', '\\ProgramData\\',
-            '\\Program Files\\Common Files\\', '\\Program Files (x86)\\Common Files\\'
+            '\\Program Files\\Common Files\\', '\\Program Files (x86)\\Common Files\\',
+            
+            # macOS system directories
+            '/System/Library/', '/System/Applications/', '/Library/Apple/', 
+            '/usr/libexec/', '/usr/sbin/', '/usr/bin/', '/sbin/', '/bin/',
+            '/Library/PrivateFrameworks/', '/Library/Frameworks/',
+            '/System/Library/CoreServices/', '/System/Library/PrivateFrameworks/'
         ]
         
         # Get list of running processes

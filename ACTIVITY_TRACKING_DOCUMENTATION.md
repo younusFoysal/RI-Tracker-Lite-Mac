@@ -34,8 +34,8 @@ The activity tracking mechanism is implemented in the `Api` class in `backend/ma
    - `stop_activity_tracking`: Stops the activity tracking thread
 
 3. **JavaScript Interface Methods**:
-   - `record_keyboard_activity`: Interface method for the frontend to report keyboard activity
-   - `record_mouse_activity`: Interface method for the frontend to report mouse activity
+   - `record_keyboard_activity`: Interface method for the frontend to report keyboard activity (enhanced to work even when system-wide tracking is disabled)
+   - `record_mouse_activity`: Interface method for the frontend to report mouse activity (enhanced to work even when system-wide tracking is disabled)
    - `get_activity_stats`: Returns current activity statistics
 
 4. **Timer Methods**:
@@ -96,6 +96,20 @@ The implementation handles several edge cases:
    - The total time (active + idle) is verified to match the total duration
    - Any discrepancies are adjusted to ensure consistency
 
+## Platform-Specific Considerations
+
+The activity tracking implementation handles platform-specific considerations:
+
+1. **macOS**:
+   - On macOS, system-wide tracking using pynput requires special permissions
+   - The application checks for these permissions and falls back to browser-based tracking if they're not granted
+   - The `record_keyboard_activity` and `record_mouse_activity` methods are enhanced to ensure events are properly tracked even when system-wide tracking is disabled
+   - This ensures keyboard and mouse activity rates are accurately calculated on all platforms
+
+2. **Windows and Linux**:
+   - On Windows and Linux, system-wide tracking works without special permissions
+   - The application uses both system-wide tracking and browser-based tracking for maximum accuracy
+
 ## Future Improvements
 
 Potential future improvements to the activity tracking mechanism:
@@ -104,3 +118,4 @@ Potential future improvements to the activity tracking mechanism:
 2. **Activity visualization**: Visualize active and idle periods in the UI
 3. **More detailed activity metrics**: Track more detailed activity metrics (e.g., keystrokes per minute)
 4. **Automatic break detection**: Detect and suggest breaks based on activity patterns
+5. **Improved permission handling**: Better guide users through granting necessary permissions on macOS
