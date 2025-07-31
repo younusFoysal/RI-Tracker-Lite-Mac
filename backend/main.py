@@ -25,10 +25,23 @@ import screeninfo
 # Import pynput for system-wide keyboard and mouse tracking
 try:
     from pynput import keyboard, mouse
-    PYNPUT_AVAILABLE = True
+    
+    # Check if we're on macOS
+    if platform.system() == 'Darwin':
+        # pynput is available, but we need to check permissions on macOS
+        # We'll set this to True initially, but the actual check will happen
+        # when the user tries to enable system-wide tracking
+        print("macOS detected. System-wide activity tracking will require permissions.")
+        PYNPUT_AVAILABLE = True
+        MACOS_PERMISSIONS_CHECKED = False
+    else:
+        # On other platforms, we can use pynput directly
+        PYNPUT_AVAILABLE = True
+        MACOS_PERMISSIONS_CHECKED = True
 except ImportError:
     print("pynput library not available. System-wide activity tracking will be disabled.")
     PYNPUT_AVAILABLE = False
+    MACOS_PERMISSIONS_CHECKED = False
 
 
 APP_NAME = "RI_Tracker"
@@ -89,7 +102,8 @@ class Api:
         # System-wide activity tracking variables (pynput)
         self.keyboard_listener = None
         self.mouse_listener = None
-        self.system_tracking_enabled = PYNPUT_AVAILABLE
+        self.system_tracking_enabled = PYNPUT_AVAILABLE and (not platform.system() == 'Darwin' or MACOS_PERMISSIONS_CHECKED)
+        self.macos_permissions_checked = MACOS_PERMISSIONS_CHECKED
         
         # Stats update variables
         self.stats_timer = None
@@ -945,6 +959,13 @@ class Api:
         self.last_active_check_time = self.last_activity_time
         self.is_idle = False
         
+        # For macOS, check permissions if system tracking is enabled but permissions haven't been checked
+        if platform.system() == 'Darwin' and self.system_tracking_enabled and not self.macos_permissions_checked:
+            permission_check = self.check_macos_permissions()
+            if not permission_check.get("has_permissions", False):
+                print("macOS input monitoring permissions not granted. System-wide tracking disabled.")
+                self.system_tracking_enabled = False
+        
         # Start system-wide input listeners if enabled
         if self.system_tracking_enabled:
             try:
@@ -969,6 +990,20 @@ class Api:
             except Exception as e:
                 print(f"Error starting system-wide activity tracking: {e}")
                 self.system_tracking_enabled = False
+                
+                # If on macOS and error is permission-related, update permission status
+                if platform.system() == 'Darwin':
+                    error_str = str(e).lower()
+                    if "permission" in error_str or "accessibility" in error_str or "privacy" in error_str:
+                        self.macos_permissions_checked = False
+        else:
+            if platform.system() == 'Darwin':
+                if not self.macos_permissions_checked:
+                    print("On macOS, system-wide tracking requires input monitoring permissions. Using browser events instead.")
+                else:
+                    print("On macOS, activity tracking will rely on browser events instead of system-wide tracking")
+            else:
+                print("System-wide activity tracking is disabled, falling back to browser events")
         
         # Start the activity check timer
         self.activity_timer = threading.Timer(self.activity_check_interval, activity_check)
@@ -1021,6 +1056,94 @@ class Api:
         if self.start_time:
             self.record_activity('mouse')
     
+    def check_macos_permissions(self):
+        """Check if pynput has necessary permissions on macOS"""
+        if platform.system() != 'Darwin':
+            # Not on macOS, so permissions are not an issue
+            return {"success": True, "has_permissions": True}
+            
+        try:
+            # Try to create a temporary listener to check permissions
+            # This will raise an exception if permissions are not granted
+            temp_listener = keyboard.Listener(on_press=lambda key: None)
+            temp_listener.start()
+            temp_listener.stop()
+            
+            # If we get here, permissions are granted
+            global MACOS_PERMISSIONS_CHECKED
+            MACOS_PERMISSIONS_CHECKED = True
+            self.macos_permissions_checked = True
+            
+            return {"success": True, "has_permissions": True}
+        except Exception as e:
+            error_str = str(e).lower()
+            if "permission" in error_str or "accessibility" in error_str or "privacy" in error_str:
+                # Permission-related error
+                return {"success": True, "has_permissions": False, "message": str(e)}
+            else:
+                # Some other error
+                return {"success": False, "message": f"Error checking permissions: {str(e)}"}
+    
+    def request_macos_permissions(self):
+        """Guide the user to enable input monitoring permissions on macOS"""
+        if platform.system() != 'Darwin':
+            return {"success": False, "message": "Not on macOS, permissions not required"}
+            
+        # Open System Preferences to the Security & Privacy pane
+        try:
+            # First check if we already have permissions
+            check_result = self.check_macos_permissions()
+            if check_result.get("has_permissions", False):
+                return {"success": True, "message": "Permissions already granted"}
+                
+            # Open System Preferences to the Security & Privacy pane, Input Monitoring tab
+            subprocess.run([
+                "open", 
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
+            ])
+            
+            return {
+                "success": True, 
+                "message": "Please enable input monitoring for this application in System Preferences"
+            }
+        except Exception as e:
+            return {"success": False, "message": f"Error requesting permissions: {str(e)}"}
+    
+    def toggle_system_tracking(self, enable=True):
+        """Enable or disable system-wide activity tracking"""
+        # If trying to enable on macOS, check permissions first
+        if enable and platform.system() == 'Darwin' and not self.macos_permissions_checked:
+            check_result = self.check_macos_permissions()
+            if not check_result.get("has_permissions", False):
+                return {
+                    "success": False, 
+                    "message": "Input monitoring permissions required",
+                    "needs_permissions": True
+                }
+        
+        # Update the tracking state
+        self.system_tracking_enabled = enable and PYNPUT_AVAILABLE
+        
+        # If timer is running, restart activity tracking with new settings
+        if self.start_time:
+            self.stop_activity_tracking()
+            self.start_activity_tracking()
+        
+        return {
+            "success": True,
+            "system_tracking_enabled": self.system_tracking_enabled
+        }
+    
+    def get_system_tracking_status(self):
+        """Get the current status of system-wide activity tracking"""
+        return {
+            "success": True,
+            "system_tracking_enabled": self.system_tracking_enabled,
+            "pynput_available": PYNPUT_AVAILABLE,
+            "is_macos": platform.system() == 'Darwin',
+            "macos_permissions_checked": self.macos_permissions_checked
+        }
+    
     def get_activity_stats(self):
         """Get current activity statistics"""
         if not self.start_time:
@@ -1032,7 +1155,7 @@ class Api:
             "idle_time": self.idle_time,
             "keyboard_rate": self.keyboard_activity_rate,
             "mouse_rate": self.mouse_activity_rate,
-            "is_idle": self.is_idle
+            "system_tracking_enabled": self.system_tracking_enabled
         }
         
     def check_running_applications(self):
