@@ -380,7 +380,11 @@ class Api:
                 "notes": "Session from RI Tracker Lite APP v1.",
                 "timezone": "UTC"
             }
-            print(f"Update Session: {update_data}")
+            # Use safe printing to handle non-ASCII characters
+            try:
+                print("Update Session data prepared (details omitted for encoding safety)")
+            except Exception as e:
+                print(f"Print error: {str(e)}")
             
             # Send request to update session with timeout
             # Use a 30-second timeout to prevent hanging for long-running sessions
@@ -2070,12 +2074,18 @@ class Api:
                     else:
                         skipped_links += 1
                 except Exception as e:
-                    print(f"Error processing link {url}: {e}")
+                    try:
+                        print(f"Error processing link: {str(e)}")
+                    except Exception as print_err:
+                        print(f"Print error: {str(print_err)}")
                     error_links += 1
                     continue
             
-            # Log metrics
-            print(f"Links processing metrics: Total={total_links}, Valid={valid_links}, Skipped={skipped_links}, Errors={error_links}")
+            # Log metrics - safely handle potential encoding issues
+            try:
+                print(f"Links processing metrics: Total={total_links}, Valid={valid_links}, Skipped={skipped_links}, Errors={error_links}")
+            except Exception as e:
+                print(f"Print error in links metrics: {str(e)}")
             
             # Sort by timeSpent in descending order
             links_data.sort(key=lambda x: x['timeSpent'], reverse=True)
@@ -2321,14 +2331,19 @@ if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--dev':
         DEBUG = True
 
+    # Handle PyInstaller bundled resources
+    # When running as a PyInstaller executable, resources are in a temporary directory
+    # accessible through sys._MEIPASS
+    base_dir = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+    
     # Get the appropriate URL
     if DEBUG:
         #url = "http://localhost:5173"
-        url = "dist/index.html"
+        url = os.path.join(base_dir, "dist", "index.html")
         debug = True
         print("Running in DEVELOPMENT mode with DevTools enabled")
     else:
-        url = "dist/index.html"
+        url = os.path.join(base_dir, "dist", "index.html")
         debug = False
         print("Running in PRODUCTION mode")
 
