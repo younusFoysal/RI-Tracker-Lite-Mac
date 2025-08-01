@@ -66,13 +66,21 @@ export const AuthProvider = ({ children }) => {
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
+                // In case of error, default to not authenticated
+                setToken(null);
+                setCurrentUser(null);
             } finally {
+                // Set loading to false after all auth operations are complete
                 setLoading(false);
             }
         };
 
         if (pywebviewReady) {
-            checkAuthStatus();
+            // Set a small timeout to ensure backend is fully ready
+            // This helps prevent race conditions where the UI renders before auth is complete
+            setTimeout(() => {
+                checkAuthStatus();
+            }, 300);
         }
     }, [pywebviewReady]);
 

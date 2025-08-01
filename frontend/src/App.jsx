@@ -1094,9 +1094,9 @@ export default function App() {
 
 // Component that handles conditional rendering based on authentication status
 function AuthenticatedApp() {
-    const { isAuthenticated, loading } = useAuth();
+    const { isAuthenticated, loading, token } = useAuth();
 
-    console.log(isAuthenticated, loading);
+    console.log("Auth state:", { isAuthenticated: isAuthenticated(), loading, token });
 
     // Enhanced loading screen
     if (loading) {
@@ -1117,5 +1117,7 @@ function AuthenticatedApp() {
     }
 
     // Show Login page if not authenticated, otherwise show the app content
+    // We explicitly check if token is null to ensure we don't show the login page
+    // when authentication state is still being determined
     return isAuthenticated() ? <AppContent /> : <Login />;
 }
