@@ -1096,6 +1096,8 @@ export default function App() {
 function AuthenticatedApp() {
     const { isAuthenticated, loading } = useAuth();
 
+    console.log(isAuthenticated, loading);
+
     // Enhanced loading screen
     if (loading) {
         return (

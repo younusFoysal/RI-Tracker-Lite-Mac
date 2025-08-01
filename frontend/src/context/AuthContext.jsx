@@ -29,13 +29,40 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const checkAuthStatus = async () => {
             try {
+                console.log("Checking authentication status...");
+                
+                // First, force a reload of auth data from the database
+                // This ensures we're working with the latest data
+                try {
+                    await window.pywebview.api.reload_auth_data();
+                    console.log("Forced reload of auth data completed");
+                } catch (reloadError) {
+                    console.warn("Could not force reload auth data:", reloadError);
+                }
+                
                 const isAuthResponse = await window.pywebview.api.is_authenticated();
+                console.log("Auth response:", isAuthResponse);
+                
                 if (isAuthResponse.authenticated) {
+                    console.log("Backend reports authenticated=true");
                     const userResponse = await window.pywebview.api.get_current_user();
+                    console.log("User response:", userResponse);
+                    
                     if (userResponse.success) {
+                        console.log("Setting user and token state");
                         setCurrentUser(userResponse.user);
                         setToken("token-exists");
+                    } else {
+                        console.error("User data fetch failed despite being authenticated");
+                        // Even if we can't get user data, we know we're authenticated
+                        // So set token to ensure login screen doesn't show
+                        setToken("token-exists");
                     }
+                } else {
+                    console.log("Not authenticated according to backend");
+                    // Ensure token is null to show login screen
+                    setToken(null);
+                    setCurrentUser(null);
                 }
             } catch (error) {
                 console.error('Auth check error:', error);

@@ -48,7 +48,36 @@ APP_NAME = "RI_Tracker"
 APP_VERSION = "1.0.12"  # Current version of the application
 # GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Releases"
-DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
+# Define platform-specific data directory
+# macOS: Use ~/Library/Application Support which is the standard location for application data
+# Windows: Use %LOCALAPPDATA% which is the standard location for application data
+# Other platforms: Fall back to ~/.config which is the standard location for application data on Linux
+if platform.system() == 'Darwin':  # macOS
+    # Use the standard macOS application data directory
+    # This ensures data persistence between app sessions on macOS
+    DATA_DIR = os.path.join(os.path.expanduser("~/Library/Application Support"), APP_NAME)
+    
+    # Migration logic for existing users who have data in the old location
+    # Previously, the app was using ~/.config on macOS which might not be properly persisted
+    old_data_dir = os.path.join(os.path.expanduser("~/.config"), APP_NAME)
+    old_db_file = os.path.join(old_data_dir, 'tracker.db')
+    if os.path.exists(old_db_file) and os.path.getsize(old_db_file) > 0:
+        print(f"Found data in old location: {old_db_file}")
+        # Ensure new directory exists
+        os.makedirs(DATA_DIR, exist_ok=True)
+        new_db_file = os.path.join(DATA_DIR, 'tracker.db')
+        # Only copy if the new file doesn't exist or is empty
+        # This prevents overwriting newer data with older data
+        if not os.path.exists(new_db_file) or os.path.getsize(new_db_file) == 0:
+            try:
+                shutil.copy2(old_db_file, new_db_file)
+                print(f"Migrated database from {old_db_file} to {new_db_file}")
+            except Exception as e:
+                print(f"Error migrating database: {e}")
+else:  # Windows and other platforms
+    # On Windows, use LOCALAPPDATA environment variable
+    # On other platforms, fall back to ~/.config
+    DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA') or os.path.expanduser("~/.config"), APP_NAME)
 
 # Ensure the directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -146,47 +175,121 @@ class Api:
     def load_auth_data(self):
         """Load authentication data from the database"""
         try:
-            with sqlite3.connect(db_file) as conn:
+            # Ensure the database directory exists
+            os.makedirs(os.path.dirname(db_file), exist_ok=True)
+            
+            # Ensure the database is initialized
+            if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+                init_db()
+                print(f"Database initialized at: {db_file}")
+            
+            # Connect with a timeout to handle potential locking issues
+            with sqlite3.connect(db_file, timeout=10) as conn:
                 c = conn.cursor()
                 c.execute('SELECT token, user_data FROM auth_data ORDER BY id DESC LIMIT 1')
                 result = c.fetchone()
                 if result:
                     self.auth_token = result[0]
-                    self.user_data = json.loads(result[1])
-                    return True
+                    try:
+                        user_data_str = result[1]
+                        print(f"Raw user data from DB: {user_data_str[:100]}...")  # Print first 100 chars
+                        self.user_data = json.loads(user_data_str)
+                        print(f"Authentication data loaded successfully for user: {self.user_data.get('name', 'Unknown')}")
+                        print(f"Token length: {len(self.auth_token)}, User data keys: {list(self.user_data.keys())}")
+                        return True
+                    except json.JSONDecodeError as json_err:
+                        print(f"JSON decode error in auth data: {json_err}")
+                        print(f"Problematic JSON string: {user_data_str[:100]}...")
+                        self.auth_token = None
+                        self.user_data = None
+                        return False
+                print("No authentication data found in database")
                 return False
+        except sqlite3.Error as e:
+            print(f"SQLite error loading auth data: {e}")
+            self.auth_token = None
+            self.user_data = None
+            return False
         except Exception as e:
-            print(f"Error loading auth data: {e}")
+            print(f"Unexpected error loading auth data: {e}")
+            self.auth_token = None
+            self.user_data = None
             return False
 
     def save_auth_data(self, token, user_data):
         """Save authentication data to the database"""
         try:
-            with sqlite3.connect(db_file) as conn:
+            # Ensure the database directory exists
+            os.makedirs(os.path.dirname(db_file), exist_ok=True)
+            
+            # Ensure the database is initialized
+            if not os.path.exists(db_file) or os.path.getsize(db_file) == 0:
+                init_db()
+                print(f"Database initialized at: {db_file}")
+            
+            # Connect with a timeout to handle potential locking issues
+            with sqlite3.connect(db_file, timeout=10) as conn:
+                # Enable foreign keys
+                conn.execute('PRAGMA foreign_keys = ON')
+                
                 # Clear existing data
                 conn.execute('DELETE FROM auth_data')
+                
                 # Save new data
                 conn.execute(
                     'INSERT INTO auth_data (token, user_data) VALUES (?, ?)',
                     (token, json.dumps(user_data))
                 )
+                
+                # Commit the transaction explicitly
+                conn.commit()
+                
+            # Update in-memory state
             self.auth_token = token
             self.user_data = user_data
+            
+            print(f"Authentication data saved successfully for user: {user_data.get('name', 'Unknown')}")
             return True
+            
+        except sqlite3.Error as e:
+            print(f"SQLite error saving auth data: {e}")
+            return False
+        except json.JSONDecodeError as e:
+            print(f"JSON encode error in auth data: {e}")
+            return False
         except Exception as e:
-            print(f"Error saving auth data: {e}")
+            print(f"Unexpected error saving auth data: {e}")
             return False
 
     def clear_auth_data(self):
         """Clear authentication data from the database"""
         try:
-            with sqlite3.connect(db_file) as conn:
-                conn.execute('DELETE FROM auth_data')
+            # Ensure the database exists before attempting to clear it
+            if os.path.exists(db_file):
+                with sqlite3.connect(db_file, timeout=10) as conn:
+                    conn.execute('DELETE FROM auth_data')
+                    # Commit the transaction explicitly
+                    conn.commit()
+                    print("Authentication data cleared successfully")
+            else:
+                print("No database file found to clear")
+                
+            # Clear in-memory state regardless of database operation
             self.auth_token = None
             self.user_data = None
             return True
+            
+        except sqlite3.Error as e:
+            print(f"SQLite error clearing auth data: {e}")
+            # Still clear in-memory state even if database operation fails
+            self.auth_token = None
+            self.user_data = None
+            return False
         except Exception as e:
-            print(f"Error clearing auth data: {e}")
+            print(f"Unexpected error clearing auth data: {e}")
+            # Still clear in-memory state even if operation fails
+            self.auth_token = None
+            self.user_data = None
             return False
 
     def login(self, email, password, remember_me=False):
@@ -252,14 +355,29 @@ class Api:
         result = self.clear_auth_data()
         return {"success": result}
 
+    def reload_auth_data(self):
+        """Force a reload of authentication data from the database"""
+        print("Forcing reload of authentication data from database")
+        result = self.load_auth_data()
+        return {"success": result, "authenticated": self.auth_token is not None}
+        
     def is_authenticated(self):
         """Check if user is authenticated"""
-        return {"authenticated": self.auth_token is not None}
+        is_auth = self.auth_token is not None
+        print(f"Authentication check: token exists = {is_auth}")
+        if is_auth and self.user_data:
+            print(f"User data available for: {self.user_data.get('name', 'Unknown')}")
+        return {"authenticated": is_auth, "user_data_available": self.user_data is not None}
 
     def get_current_user(self):
         """Get current user data"""
+        print(f"get_current_user called, user_data exists: {self.user_data is not None}")
         if self.user_data:
-            return {"success": True, "user": self.user_data}
+            # Make a copy to ensure we're not returning a reference that might be modified
+            user_data_copy = json.loads(json.dumps(self.user_data))
+            print(f"Returning user data for: {user_data_copy.get('name', 'Unknown')}")
+            return {"success": True, "user": user_data_copy}
+        print("No user data available when get_current_user was called")
         return {"success": False, "message": "No user data available"}
         
     def get_current_session_time(self):
@@ -2497,14 +2615,24 @@ class Api:
             }
 
 if __name__ == '__main__':
+    # Print database path information for debugging
+    print(f"Database path: {db_file}")
+    print(f"Database directory: {os.path.dirname(db_file)}")
+    print(f"Database directory exists: {os.path.exists(os.path.dirname(db_file))}")
+    print(f"Database file exists: {os.path.exists(db_file)}")
+    
+    # Initialize database
     init_db()
+    print("Database initialized")
+    
+    # Create API instance
     api = Api()
 
     # Determine if we're in development or production mode
     #DEBUG = True
     DEBUG = URLS["DEBUG"]
-    if len(sys.argv) > 1 and sys.argv[1] == '--dev':
-        DEBUG = True
+    # if len(sys.argv) > 1 and sys.argv[1] == '--dev':
+    #     DEBUG = True
 
     # Handle PyInstaller bundled resources
     # When running as a PyInstaller executable, resources are in a temporary directory
