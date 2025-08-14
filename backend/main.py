@@ -2723,8 +2723,8 @@ if __name__ == '__main__':
     # Determine if we're in development or production mode
     #DEBUG = True
     DEBUG = URLS["DEBUG"]
-    if len(sys.argv) > 1 and sys.argv[1] == '--dev':
-        DEBUG = True
+    # if len(sys.argv) > 1 and sys.argv[1] == '--dev':
+    #     DEBUG = True
 
     # Handle PyInstaller bundled resources
     # When running as a PyInstaller executable, resources are in a temporary directory
