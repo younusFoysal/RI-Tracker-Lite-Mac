@@ -50,7 +50,7 @@ except ImportError:
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.15"  # Current version of the application
+APP_VERSION = "1.0.14"  # Current version of the application
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Mac-Releases"
 # Define platform-specific data directory
 # macOS: Use ~/Library/Application Support which is the standard location for application data
@@ -1314,7 +1314,11 @@ class Api:
             self.record_activity('mouse')
     
     def check_macos_permissions(self):
-        """Check if pynput has necessary permissions on macOS"""
+        """Safely determine macOS input monitoring permission without creating listeners or touching HIToolbox off the main thread.
+
+        On macOS 14/15, creating a listener or querying input sources off the main thread can crash.
+        To avoid this, we conservatively report permission as not granted unless explicitly toggled later.
+        """
         if platform.system() != 'Darwin':
             # Not on macOS, so permissions are not an issue
             return {"success": True, "has_permissions": True}
@@ -1324,30 +1328,16 @@ class Api:
             return {"success": False, "has_permissions": False, "message": "pynput library not available"}
             
         try:
-            # Try to create a temporary listener to check permissions
-            # This will raise an exception if permissions are not granted
-            temp_listener = keyboard.Listener(on_press=lambda key: None)
-            temp_listener.daemon = True  # Ensure the listener doesn't block app exit
-            temp_listener.start()
-            time.sleep(0.1)  # Short delay to ensure listener starts
-            temp_listener.stop()
-            
-            # If we get here, permissions are granted
-            global MACOS_PERMISSIONS_CHECKED
-            MACOS_PERMISSIONS_CHECKED = True
-            self.macos_permissions_checked = True
-            
-            return {"success": True, "has_permissions": True}
+            # Do not create any listeners here. Just return current cached state if we previously validated.
+            if getattr(self, "macos_permissions_checked", False) and self.system_tracking_enabled:
+                return {"success": True, "has_permissions": True}
+
+            # Conservatively return False to avoid risky probing that can crash on macOS 15
+            return {"success": True, "has_permissions": False, "message": "Permission status not probed to avoid macOS crash"}
         except Exception as e:
-            error_str = str(e).lower()
-            if "permission" in error_str or "accessibility" in error_str or "privacy" in error_str:
-                # Permission-related error
-                return {"success": True, "has_permissions": False, "message": str(e)}
-            else:
-                # Some other error
-                print(f"Unexpected error checking macOS permissions: {e}")
-                # Return false for has_permissions to be safe
-                return {"success": False, "has_permissions": False, "message": f"Error checking permissions: {str(e)}"}
+            print(f"Unexpected error checking macOS permissions: {e}")
+            # Return false for has_permissions to be safe
+            return {"success": False, "has_permissions": False, "message": f"Error checking permissions: {str(e)}"}
     
     def request_macos_permissions(self):
         """Guide the user to enable input monitoring permissions on macOS"""
@@ -2868,8 +2858,8 @@ if __name__ == '__main__':
                     print("Requesting macOS input monitoring permissions...")
                     try:
                         api.request_macos_permissions()
-                        # Set system tracking to enabled so it will be used once permissions are granted
-                        api.system_tracking_enabled = True
+                        # Do not enable system tracking automatically; wait until user explicitly enables it
+                        api.system_tracking_enabled = False
                     except Exception as e:
                         print(f"Error requesting permissions: {e}")
                         # Don't crash if permission request fails
