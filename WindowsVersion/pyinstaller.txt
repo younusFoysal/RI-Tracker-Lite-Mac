@@ -1,0 +1,3 @@
+
+# Build with:
+# pyinstaller --onefile --noconsole main.py

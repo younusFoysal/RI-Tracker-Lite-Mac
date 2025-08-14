@@ -1,0 +1,13 @@
+RI Tracker - End User License Agreement
+
+Please read this agreement carefully before using this software.
+By installing or using this software, you agree to the terms of this agreement.
+
+RI Tracker is an employee tracking software developed by RemoteIntegrity LLC, designed to monitor user activity, productivity, and work behavior for organizational purposes. This software may collect data such as time logs, active applications, visited websites, screenshots, and keystroke patterns.
+
+By using RI Tracker, you acknowledge and consent to such monitoring and agree that the data collected may be used by your employer in accordance with company policies and applicable laws.
+
+Unauthorized reproduction, distribution, or modification of this software is strictly prohibited.
+This software is licensed, not sold. All rights are reserved by RemoteIntegrity LLC.
+
+If you do not agree to these terms, do not install or use this software.

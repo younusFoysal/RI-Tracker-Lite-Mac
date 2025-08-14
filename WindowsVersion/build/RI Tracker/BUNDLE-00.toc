@@ -1,0 +1,4 @@
+([('RI Tracker',
+   '/Users/younusfoysal/Documents/Projects/PyCharmProjects/RI-Tracker-Lite/backend/dist/RI '
+   'Tracker',
+   'EXECUTABLE')],)
