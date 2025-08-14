@@ -35,11 +35,11 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
+    icon=['icon.icns'],
 )
 app = BUNDLE(
     exe,
     name='RI Tracker.app',
-    icon='icon.ico',
+    icon='icon.icns',
     bundle_identifier=None,
 )
