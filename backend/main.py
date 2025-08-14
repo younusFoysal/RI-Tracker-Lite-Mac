@@ -1091,13 +1091,49 @@ class Api:
                 self.mouse_events += 1
                 self.last_mouse_event_time = current_time
     
+    def get_idle_seconds_macos(self):
+        """Return system idle seconds on macOS using Quartz without requiring Accessibility permissions.
+        Returns a float number of seconds since last user input, or None if not on macOS or unavailable.
+        """
+        try:
+            if platform.system() != 'Darwin':
+                return None
+            # Import lazily to avoid hard dependency at import time on other platforms
+            import Quartz
+            idle_secs = Quartz.CGEventSourceSecondsSinceLastEventType(
+                Quartz.kCGEventSourceStateCombinedSessionState,
+                Quartz.kCGAnyInputEventType
+            )
+            # Some environments may return huge/inf/negative values if unavailable; sanitize
+            if idle_secs is None:
+                return None
+            if idle_secs < 0 or idle_secs > 10**7:
+                return None
+            return float(idle_secs)
+        except Exception:
+            return None
+    
     def check_idle_status(self):
-        """Check if user is idle based on last activity time"""
-        if not self.start_time or not self.last_activity_time:
+        """Check if user is idle based on last activity time.
+        On macOS, prefer Quartz system idle seconds to avoid requiring Input Monitoring permissions
+        and to work while the app is minimized.
+        """
+        if not self.start_time:
             return
-            
+        
         current_time = time.time()
-        time_since_last_activity = current_time - self.last_activity_time
+        mac_idle_secs = self.get_idle_seconds_macos()
+        
+        if mac_idle_secs is not None:
+            # Use system idle time
+            time_since_last_activity = mac_idle_secs
+            # Keep last_activity_time coherent for consumers that rely on it
+            self.last_activity_time = current_time - mac_idle_secs
+        else:
+            # Fallback to internal last_activity_time tracking
+            if not self.last_activity_time:
+                return
+            time_since_last_activity = current_time - self.last_activity_time
         
         # If previously active but now idle
         if not self.is_idle and time_since_last_activity >= self.idle_threshold:
@@ -1116,7 +1152,7 @@ class Api:
             idle_duration = current_time - self.last_active_check_time
             self.idle_time += idle_duration
             self.last_active_check_time = current_time
-            
+        
         # If active and still active, update active time
         elif not self.is_idle and self.last_active_check_time is not None:
             active_duration = current_time - self.last_active_check_time
