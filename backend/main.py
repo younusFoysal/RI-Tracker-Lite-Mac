@@ -526,6 +526,9 @@ class Api:
             # Step 3: format UTC time as ISO string for backend
             end_time = utc_time.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
+            # Create session update data
+            # end_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
             # Prepare screenshots data
             screenshots_data = self.screenshots_for_session.copy()
             
@@ -548,7 +551,6 @@ class Api:
             links_data = self.prepare_links_for_session()
             
             update_data = {
-                "endTime": end_time,
                 "activeTime": active_time,
                 "idleTime": idle_time,
                 "keyboardActivityRate": keyboard_rate,
@@ -557,9 +559,13 @@ class Api:
                 "applications": applications_data,
                 "links": links_data,
                 "notes": "Session from RI Tracker Lite APP v1.",
-                "userNote": user_note,
-                #"timezone": "UTC"
+                "userNote": user_note
+                # "timezone": "UTC"
             }
+
+            # Only include endTime when this is the final update (timer is stopped)
+            if is_final_update:
+                update_data["endTime"] = end_time
             # Use safe printing to handle non-ASCII characters
             try:
                 print("Update Session data prepared (details omitted for encoding safety)")
@@ -586,10 +592,7 @@ class Api:
                     self.session_id = None
                 return {"success": True, "data": data['data']}
             else:
-                error_message = data.get('message', 'Failed to update session')
-                if self.window:
-                    self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
-                return {"success": False, "message": error_message}
+                return {"success": False, "message": data.get('message', 'Failed to update session')}
         # except requests.exceptions.Timeout:
         #     print("Update session timeout: Request timed out after 30 seconds")
         #     # For final updates, we should still consider the timer stopped locally
@@ -613,8 +616,6 @@ class Api:
             # For final updates, we should still consider the timer stopped locally
             # if is_final_update:
             #     self.session_id = None
-            if self.window:
-                self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def start_stats_updates(self):
@@ -686,7 +687,8 @@ class Api:
                 idle_time=int(self.idle_time),
                 keyboard_rate=self.keyboard_activity_rate,
                 mouse_rate=self.mouse_activity_rate,
-                is_final_update=False
+                is_final_update=False,
+                user_note=self.user_note if hasattr(self, 'user_note') else "I am working on Task"
             )
             
             # Clear the screenshots array for the next interval
@@ -886,12 +888,18 @@ class Api:
         
         print(f"Screenshot scheduled in {random_interval} seconds ({random_interval/60:.1f} minutes)")
     
-    def start_timer(self, project_name):
-        """Start the timer and create a new session"""
+    def start_timer(self, project_name, user_note="I am working on Task"):
+        """Start the timer and create a new session
+
+        Args:
+            project_name: The name of the project
+            user_note: User's note about what they're working on
+        """
         current_time = time.time()
         self.start_time = current_time
         self.current_project = project_name
-        
+        self.user_note = user_note
+
         # Reset all activity tracking variables
         self.active_time = 0
         self.idle_time = 0
@@ -941,7 +949,7 @@ class Api:
         stats = self.start_stats_updates()
         
         # Create a new session
-        result = self.create_session()
+        result = self.create_session(user_note)
         
         # Start session updates (every 10 minutes)
         self.start_session_updates()
@@ -1013,7 +1021,8 @@ class Api:
                 idle_time=self.idle_time,
                 keyboard_rate=self.keyboard_activity_rate,
                 mouse_rate=self.mouse_activity_rate,
-                is_final_update=True
+                is_final_update=True,
+                user_note=self.user_note if hasattr(self, 'user_note') else "I am working on Task"
             )
             
             # Stop stats updates
@@ -1356,7 +1365,7 @@ class Api:
             "idle_time": self.idle_time,
             "keyboard_rate": self.keyboard_activity_rate,
             "mouse_rate": self.mouse_activity_rate,
-            "system_tracking_enabled": self.system_tracking_enabled
+            "is_idle": self.is_idle
         }
         
     def check_running_applications(self):
@@ -1703,8 +1712,8 @@ class Api:
             print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
             cutoff_time = int(time.time()) - 600
             
-        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
-        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        # Always use long-term check mode to ensure we capture all history since timer started
+        is_long_term_check = True
         
         # Create a copy of the history file to avoid database lock issues
         temp_dir = tempfile.gettempdir()
@@ -1859,8 +1868,8 @@ class Api:
             print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
             cutoff_time = int(time.time()) - 600
             
-        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
-        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        # Always use long-term check mode to ensure we capture all history since timer started
+        is_long_term_check = True
         
         # Create a copy of the history file to avoid database lock issues
         temp_dir = tempfile.gettempdir()
@@ -2013,8 +2022,8 @@ class Api:
             print(f"Invalid cutoff time: {cutoff_time}, using current time - 600 seconds")
             cutoff_time = int(time.time()) - 600
             
-        # Determine if this is a long-term history check (24 hours) or regular check (10 minutes)
-        is_long_term_check = (int(time.time()) - cutoff_time) > 3600  # More than 1 hour
+        # Always use long-term check mode to ensure we capture all history since timer started
+        is_long_term_check = True
         
         # Create a copy of the history file to avoid database lock issues
         temp_dir = tempfile.gettempdir()
@@ -2188,8 +2197,8 @@ class Api:
         the link usage data with the time spent on each link.
         
         On the first check after the app starts (when last_link_check_time is None),
-        it uses a 24-hour window to capture existing browser history that might have
-        been created before the app was started. For subsequent checks, it uses the
+        it uses the timer start time as the cutoff to only capture browser history
+        from when the timer is running. For subsequent checks, it uses the
         regular session update interval (10 minutes) to capture only recent history.
         
         The method handles various edge cases and error conditions, such as missing
@@ -2216,12 +2225,12 @@ class Api:
         current_timestamp = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
         
         # Calculate cutoff time
-        # For the first check, use a much longer window (24 hours) to capture existing browser history
-        # For subsequent checks, use the regular session update interval (10 minutes)
+        # For the first check, use the timer start time to only capture history since timer started
+        # For subsequent checks, use the last check time minus the session update interval
         if first_check:
-            # Use 24 hours for the first check to capture existing browser history
-            cutoff_time = int(current_time) - (24 * 60 * 60)  # 24 hours in seconds
-            print(f"First browser history check - using 24-hour window to capture existing history")
+            # Use timer start time for the first check to only capture history since timer started
+            cutoff_time = int(self.start_time)
+            print(f"First browser history check - using timer start time to capture history only since timer started")
         else:
             # Use regular session update interval for subsequent checks
             cutoff_time = int(current_time) - self.session_update_interval
@@ -2469,7 +2478,7 @@ class Api:
                 return {"success": False, "message": "Employee ID not found"}
                 
             response = requests.get(
-                f'{URLS["DAILY_STATS"]}/{employee_id}',
+                f'{URLS["DAILY_STATS"]}/{employee_id}?timezone={local_tz}',
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
@@ -2498,7 +2507,7 @@ class Api:
                 return {"success": False, "message": "Employee ID not found"}
                 
             response = requests.get(
-                f'{URLS["WEEKLY_STATS"]}/{employee_id}',
+                f'{URLS["WEEKLY_STATS"]}/{employee_id}?timezone={local_tz}',
                 headers={
                     "Authorization": f"Bearer {self.auth_token}",
                     "Content-Type": "application/json"
@@ -2667,6 +2676,36 @@ class Api:
                 "message": f"An error occurred while installing the update: {str(e)}"
             }
 
+    def is_timer_running(self):
+        """Check if the timer is currently running"""
+        return self.start_time is not None
+
+    def handle_close_event(self):
+        """Handle window close event, showing confirmation dialog if timer is running"""
+        if not self.is_timer_running():
+            # Timer is not running, allow window to close
+            return True
+
+        # Timer is running, show confirmation dialog
+        result = self.window.create_confirmation_dialog(
+            "Timer Running",
+            "Your timer is currently running. Are you sure you want to close the app?"
+        )
+
+        if result:
+            # User confirmed, stop the timer and update the session
+            try:
+                self.stop_timer()
+                print("Timer stopped due to app close")
+                return True
+            except Exception as e:
+                print(f"Error stopping timer on app close: {e}")
+                # Still allow the app to close even if there was an error stopping the timer
+                return True
+        else:
+            # User cancelled, prevent window from closing
+            return False
+
 if __name__ == '__main__':
     # Print database path information for debugging
     print(f"Database path: {db_file}")
@@ -2684,8 +2723,8 @@ if __name__ == '__main__':
     # Determine if we're in development or production mode
     #DEBUG = True
     DEBUG = URLS["DEBUG"]
-    # if len(sys.argv) > 1 and sys.argv[1] == '--dev':
-    #     DEBUG = True
+    if len(sys.argv) > 1 and sys.argv[1] == '--dev':
+        DEBUG = True
 
     # Handle PyInstaller bundled resources
     # When running as a PyInstaller executable, resources are in a temporary directory
@@ -2721,7 +2760,14 @@ if __name__ == '__main__':
         height=win_height,
         min_size=(300, 400),
         resizable=False,
+        confirm_close=False,  # We'll handle confirmation ourselves
     )
+
+    # Store window reference in the API instance
+    api.window = window
+
+    # Set up the on_closing event handler
+    window.events.closing += api.handle_close_event
 
     # Start the application
     #webview.start(debug=debug)  # Optional: use 'cef' or 'qt' for better styling support

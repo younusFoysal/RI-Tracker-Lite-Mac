@@ -1122,7 +1122,8 @@ class Api:
         
         # Define system process patterns to exclude
         system_process_names = [
-            'System', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe', 
+            # Windows system processes
+            'System', 'Registry', 'smss.exe', 'csrss.exe', 'wininit.exe',
             'services.exe', 'lsass.exe', 'svchost.exe', 'winlogon.exe', 
             'dwm.exe', 'conhost.exe', 'dllhost.exe', 'taskhostw.exe',
             'explorer.exe', 'RuntimeBroker.exe', 'ShellExperienceHost.exe',
