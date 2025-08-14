@@ -419,7 +419,9 @@ class Api:
             user_note: User's note about what they're working on
         """
         if not self.auth_token:
-            window.evaluate_js('window.toastFromPython("Not authenticated. Please log in.", "error")')
+            if self.window:
+                self.window.evaluate_js('window.toastFromPython("Not authenticated. Please log in.", "error")')
+                #window.evaluate_js('window.toastFromPython("Not authenticated. Please log in.", "error")')
             return {"success": False, "message": "Not authenticated"}
         
         try:
@@ -495,11 +497,15 @@ class Api:
                     # Format the message to be more readable
                     error_message = f"Employee already has an active session. Please stop the current session before starting a new one. Active session ID: {error_message.split('ID:')[-1].strip() if 'ID:' in error_message else 'Unknown'}"
                 
-                window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
+                # window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
+                # return {"success": False, "message": error_message}
+                if self.window:
+                    self.window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
                 return {"success": False, "message": error_message}
         except Exception as e:
             print(f"Create session error: {e}")
-            window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
+            if self.window:
+                self.window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0, is_final_update=False, user_note="I am working on Task"):
@@ -592,7 +598,11 @@ class Api:
                     self.session_id = None
                 return {"success": True, "data": data['data']}
             else:
-                return {"success": False, "message": data.get('message', 'Failed to update session')}
+                # return {"success": False, "message": data.get('message', 'Failed to update session')}
+                error_message = data.get('message', 'Failed to update session')
+                if self.window:
+                    self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
+                return {"success": False, "message": error_message}
         # except requests.exceptions.Timeout:
         #     print("Update session timeout: Request timed out after 30 seconds")
         #     # For final updates, we should still consider the timer stopped locally
@@ -616,6 +626,8 @@ class Api:
             # For final updates, we should still consider the timer stopped locally
             # if is_final_update:
             #     self.session_id = None
+            if self.window:
+                self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def start_stats_updates(self):

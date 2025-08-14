@@ -838,6 +838,7 @@ function AppContent() {
                                         title={isRunning ? "Stop the timer before logging out" : "Logout"}
                                     >
                                         <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                                        Logout
                                         {/*Logout {isRunning && "(Disabled while timer is running)"}*/}
                                     </button>
                                 </div>
