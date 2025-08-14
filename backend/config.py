@@ -1,6 +1,6 @@
 # config.py
 
-APP_ENV = "local"  # or "production" or "local" or "development"
+APP_ENV = "production"  # or "production" or "local" or "development"
 
 URL_CONFIG = {
     "local": {

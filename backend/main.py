@@ -141,6 +141,8 @@ class Api:
         self.mouse_listener = None
         self.system_tracking_enabled = PYNPUT_AVAILABLE and (not platform.system() == 'Darwin' or MACOS_PERMISSIONS_CHECKED)
         self.macos_permissions_checked = MACOS_PERMISSIONS_CHECKED
+        # Track if we've already prompted the user to open Input Monitoring settings this session
+        self.macos_permission_prompted = False
         
         # Stats update variables
         self.stats_timer = None
@@ -907,27 +909,12 @@ class Api:
             project_name: The name of the project
             user_note: User's note about what they're working on
         """
-        # Check for macOS permissions before starting the timer
+        # On macOS, do not attempt Input Monitoring; rely on browser events
         if platform.system() == 'Darwin':
-            try:
-                permission_check = self.check_macos_permissions()
-                if not permission_check.get("has_permissions", False):
-                    print("Requesting macOS input monitoring permissions before starting timer...")
-                    try:
-                        self.request_macos_permissions()
-                    except Exception as e:
-                        print(f"Error requesting permissions: {e}")
-                    # We'll still start the timer, but system-wide tracking will be disabled
-                    # until permissions are granted
-                    self.system_tracking_enabled = False
-                else:
-                    # Permissions are granted, enable system tracking
-                    self.system_tracking_enabled = True and PYNPUT_AVAILABLE
-                    self.macos_permissions_checked = True
-            except Exception as e:
-                print(f"Error checking macOS permissions: {e}")
-                # Continue with timer start but disable system tracking
-                self.system_tracking_enabled = False
+            self.system_tracking_enabled = False
+            self.macos_permissions_checked = False
+            # Informative log only; no prompts
+            print("macOS detected: Skipping Input Monitoring. Using browser events for activity tracking.")
         
         current_time = time.time()
         self.start_time = current_time
@@ -1173,25 +1160,10 @@ class Api:
         self.last_active_check_time = self.last_activity_time
         self.is_idle = False
         
-        # For macOS, check permissions if system tracking is enabled
-        if platform.system() == 'Darwin' and self.system_tracking_enabled:
-            try:
-                permission_check = self.check_macos_permissions()
-                if not permission_check.get("has_permissions", False):
-                    print("macOS input monitoring permissions not granted. System-wide tracking disabled.")
-                    print("Requesting input monitoring permissions...")
-                    try:
-                        self.request_macos_permissions()
-                    except Exception as e:
-                        print(f"Error requesting permissions: {e}")
-                    # Keep system tracking enabled but it won't be used until permissions are granted
-                    # This allows the app to start using system tracking once permissions are granted
-                    # without requiring a restart
-                    self.system_tracking_enabled = False
-            except Exception as e:
-                print(f"Error checking macOS permissions during activity tracking: {e}")
-                # Disable system tracking if we can't check permissions
-                self.system_tracking_enabled = False
+        # On macOS, avoid system-wide listeners entirely; rely on browser events to prevent crashes
+        if platform.system() == 'Darwin':
+            self.system_tracking_enabled = False
+            print("On macOS, using browser events for activity tracking (system-wide listeners disabled)")
         
         # Start system-wide input listeners if enabled
         if self.system_tracking_enabled:
@@ -1314,30 +1286,19 @@ class Api:
             self.record_activity('mouse')
     
     def check_macos_permissions(self):
-        """Safely determine macOS input monitoring permission without creating listeners or touching HIToolbox off the main thread.
+        """Safe macOS Input Monitoring permission check that never probes.
 
-        On macOS 14/15, creating a listener or querying input sources off the main thread can crash.
-        To avoid this, we conservatively report permission as not granted unless explicitly toggled later.
+        On macOS 14/15, probing Input Monitoring (e.g., creating listeners) from the wrong thread can crash.
+        We avoid probing entirely and conservatively report as not granted to prevent crashes.
         """
         if platform.system() != 'Darwin':
-            # Not on macOS, so permissions are not an issue
             return {"success": True, "has_permissions": True}
-        
-        # Check if pynput is available
-        if not PYNPUT_AVAILABLE:
-            return {"success": False, "has_permissions": False, "message": "pynput library not available"}
-            
-        try:
-            # Do not create any listeners here. Just return current cached state if we previously validated.
-            if getattr(self, "macos_permissions_checked", False) and self.system_tracking_enabled:
-                return {"success": True, "has_permissions": True}
 
-            # Conservatively return False to avoid risky probing that can crash on macOS 15
-            return {"success": True, "has_permissions": False, "message": "Permission status not probed to avoid macOS crash"}
-        except Exception as e:
-            print(f"Unexpected error checking macOS permissions: {e}")
-            # Return false for has_permissions to be safe
-            return {"success": False, "has_permissions": False, "message": f"Error checking permissions: {str(e)}"}
+        # If we previously cached a positive state, honor it; otherwise, do not probe
+        if getattr(self, "macos_permissions_checked", False):
+            return {"success": True, "has_permissions": True}
+
+        return {"success": True, "has_permissions": False, "message": "Input Monitoring not used on macOS; using browser events"}
     
     def request_macos_permissions(self):
         """Guide the user to enable input monitoring permissions on macOS"""
@@ -2847,37 +2808,11 @@ if __name__ == '__main__':
     # Set up the on_closing event handler
     window.events.closing += api.handle_close_event
     
-    # Request macOS permissions if needed
+    # On macOS, avoid Input Monitoring permission flow entirely; rely on browser events
     if platform.system() == 'Darwin':
-        # Check and request input monitoring permissions on macOS
-        # This will be done after a short delay to ensure the window is fully loaded
-        def request_permissions():
-            try:
-                permission_check = api.check_macos_permissions()
-                if not permission_check.get("has_permissions", False):
-                    print("Requesting macOS input monitoring permissions...")
-                    try:
-                        api.request_macos_permissions()
-                        # Do not enable system tracking automatically; wait until user explicitly enables it
-                        api.system_tracking_enabled = False
-                    except Exception as e:
-                        print(f"Error requesting permissions: {e}")
-                        # Don't crash if permission request fails
-                        api.system_tracking_enabled = False
-            except Exception as e:
-                print(f"Error checking permissions: {e}")
-                # Disable system tracking if we can't check permissions
-                api.system_tracking_enabled = False
-
-        try:
-            # Schedule the permission request after a short delay
-            timer = threading.Timer(2.0, request_permissions)
-            timer.daemon = True  # Make sure the timer doesn't prevent app exit
-            timer.start()
-        except Exception as e:
-            print(f"Error scheduling permission request: {e}")
-            # If we can't schedule the timer, disable system tracking
-            api.system_tracking_enabled = False
+        api.system_tracking_enabled = False
+        api.macos_permissions_checked = False
+        print("macOS detected at startup: Input Monitoring disabled. Using browser events.")
 
     # Start the application
     #webview.start(debug=debug)  # Optional: use 'cef' or 'qt' for better styling support
