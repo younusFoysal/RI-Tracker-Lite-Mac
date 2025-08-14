@@ -22,6 +22,11 @@ from datetime import datetime, timezone, timedelta
 from config import URLS
 import screeninfo
 
+
+from tzlocal import get_localzone
+
+local_tz = str(get_localzone())
+
 # Import pynput for system-wide keyboard and mouse tracking
 try:
     from pynput import keyboard, mouse
@@ -45,9 +50,8 @@ except ImportError:
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.12"  # Current version of the application
-# GITHUB_REPO = "younusFoysal/RI-Tracker-Lite"
-GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Releases"
+APP_VERSION = "1.0.15"  # Current version of the application
+GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Mac-Releases"
 # Define platform-specific data directory
 # macOS: Use ~/Library/Application Support which is the standard location for application data
 # Windows: Use %LOCALAPPDATA% which is the standard location for application data
@@ -117,6 +121,10 @@ class Api:
         self.idle_time = 0
         self.keyboard_activity_rate = 0
         self.mouse_activity_rate = 0
+        self.user_note = "I am working on Task"
+        
+        # Window reference for UI interactions
+        self.window = None
         
         # Activity tracking variables
         self.last_activity_time = None
@@ -397,9 +405,21 @@ class Api:
             "elapsed_time": elapsed_time
         }
 
-    def create_session(self):
-        """Create a new session via API"""
+    def test_long_error_message(self):
+        """Test function to simulate a long error message"""
+        # Simulate a long error message for testing the UI
+        long_message = "Employee already has an active session. Please stop the current session before starting a new one. Active session ID: jhbasuydgfbyus6854657234jbhj"
+        window.evaluate_js('window.toastFromPython("Test long error message", "error")')
+        return {"success": False, "message": long_message}
+
+    def create_session(self, user_note="I am working on Task"):
+        """Create a new session via API
+        
+        Args:
+            user_note: User's note about what they're working on
+        """
         if not self.auth_token:
+            window.evaluate_js('window.toastFromPython("Not authenticated. Please log in.", "error")')
             return {"success": False, "message": "Not authenticated"}
         
         try:
@@ -427,18 +447,30 @@ class Api:
                             company_id = profile['data']['companyId']
             
             if not employee_id or not company_id:
+                window.evaluate_js('window.toastFromPython("Employee ID or Company ID not found. Please check your profile.", "error")')
                 return {"success": False, "message": "Employee ID or Company ID not found"}
-            
+
+
+            # Step 1: get local time with tz info (e.g., Dhaka time if user machine is set to Dhaka timezone)
+            local_time = datetime.now().astimezone()
+
+            # Step 2: convert local time to UTC
+            utc_time = local_time.astimezone(timezone.utc)
+
+            # Step 3: format UTC time as ISO string for backend
+            start_time = utc_time.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
             # Create session data
-            start_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            #start_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
             session_data = {
                 "employeeId": employee_id,
                 "companyId": company_id,
                 "startTime": start_time,
                 "notes": "Session from RI Tracker Lite APP v1.",
+                "userNote": user_note
                 # "timezone": "America/New_York"
-                "timezone": "UTC"
+                #"timezone": "UTC"
             }
             
             # Send request to create session
@@ -457,12 +489,20 @@ class Api:
                 self.session_id = data['data']['_id']
                 return {"success": True, "data": data['data']}
             else:
-                return {"success": False, "message": data.get('message', 'Failed to create session')}
+                error_message = data.get('message', 'Failed to create session')
+                # Check if the error message contains information about an active session
+                if "active session" in error_message.lower():
+                    # Format the message to be more readable
+                    error_message = f"Employee already has an active session. Please stop the current session before starting a new one. Active session ID: {error_message.split('ID:')[-1].strip() if 'ID:' in error_message else 'Unknown'}"
+                
+                window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
+                return {"success": False, "message": error_message}
         except Exception as e:
             print(f"Create session error: {e}")
+            window.evaluate_js('window.toastFromPython("Failed to create session!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
-    def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0, is_final_update=False):
+    def update_session(self, active_time, idle_time=0, keyboard_rate=0, mouse_rate=0, is_final_update=False, user_note="I am working on Task"):
         """Update an existing session via API
         
         Args:
@@ -471,13 +511,20 @@ class Api:
             keyboard_rate: Keyboard activity rate (events per minute)
             mouse_rate: Mouse activity rate (events per minute)
             is_final_update: Whether this is the final update (when timer is stopped)
+            user_note: User's note about what they're working on
         """
         if not self.auth_token or not self.session_id:
             return {"success": False, "message": "Not authenticated or no active session"}
         
         try:
-            # Create session update data
-            end_time = datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+            # Step 1: get local time with tz info (e.g., Dhaka time if user machine is set to Dhaka timezone)
+            local_time = datetime.now().astimezone()
+
+            # Step 2: convert local time to UTC
+            utc_time = local_time.astimezone(timezone.utc)
+
+            # Step 3: format UTC time as ISO string for backend
+            end_time = utc_time.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
 
             # Prepare screenshots data
             screenshots_data = self.screenshots_for_session.copy()
@@ -510,7 +557,8 @@ class Api:
                 "applications": applications_data,
                 "links": links_data,
                 "notes": "Session from RI Tracker Lite APP v1.",
-                "timezone": "UTC"
+                "userNote": user_note,
+                #"timezone": "UTC"
             }
             # Use safe printing to handle non-ASCII characters
             try:
@@ -538,7 +586,10 @@ class Api:
                     self.session_id = None
                 return {"success": True, "data": data['data']}
             else:
-                return {"success": False, "message": data.get('message', 'Failed to update session')}
+                error_message = data.get('message', 'Failed to update session')
+                if self.window:
+                    self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
+                return {"success": False, "message": error_message}
         # except requests.exceptions.Timeout:
         #     print("Update session timeout: Request timed out after 30 seconds")
         #     # For final updates, we should still consider the timer stopped locally
@@ -562,6 +613,8 @@ class Api:
             # For final updates, we should still consider the timer stopped locally
             # if is_final_update:
             #     self.session_id = None
+            if self.window:
+                self.window.evaluate_js('window.toastFromPython("Failed to update session!", "error")')
             return {"success": False, "message": f"An error occurred: {str(e)}"}
     
     def start_stats_updates(self):

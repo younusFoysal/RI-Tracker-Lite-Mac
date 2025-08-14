@@ -143,6 +143,42 @@ const IconClose = ({ className }) => (
     </svg>
 );
 
+// Note Popup Component
+const NotePopup = ({ onClose, onSave, initialNote = "" }) => {
+    const [note, setNote] = useState(initialNote);
+    
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-xl w-80 overflow-hidden animate-scaleIn">
+                <div className="relative p-4 flex justify-end">
+                    <button 
+                        onClick={onClose}
+                        className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    >
+                        <IconClose className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+                <div className="px-6 pb-6 pt-0 flex flex-col">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">Add Note</h2>
+                    <textarea 
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="What are you working on?"
+                        className="w-full border border-gray-300 rounded-lg p-3 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={4}
+                    />
+                    <button 
+                        onClick={() => onSave(note)}
+                        className="px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                    >
+                        Save Note
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Update Popup Component
 const UpdatePopup = ({ 
     appIcon, 
@@ -401,6 +437,10 @@ function AppContent() {
     const [sessionInfo, setSessionInfo] = useState(null);
     const [timerError, setTimerError] = useState(null);
     const [isTimerOperationPending, setIsTimerOperationPending] = useState(false);
+    
+    // State for user note
+    const [userNote, setUserNote] = useState("I am working on Task");
+    const [showNotePopup, setShowNotePopup] = useState(false);
 
     // State for stats
     const [dailyStats, setDailyStats] = useState({
@@ -741,6 +781,19 @@ function AppContent() {
             )}
 
             <div className="h-full glass-card  overflow-hidden modern-shadow fade-in flex flex-col">
+                
+                {/* Note Popup */}
+                {showNotePopup && (
+                    <NotePopup 
+                        initialNote={userNote}
+                        onClose={() => setShowNotePopup(false)}
+                        onSave={(note) => {
+                            setUserNote(note);
+                            setShowNotePopup(false);
+                            toast.success("Note saved successfully!");
+                        }}
+                    />
+                )}
 
                 {/* Compact Header */}
                 <div className="bg-[#002B91] px-6 pt-4 pb-4 text-white flex-shrink-0">
@@ -799,8 +852,14 @@ function AppContent() {
                 <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4 ">
                     {/* Compact Project Selection */}
                     <div className="slide-in-up">
-                        <div className="mb-3">
+                        <div className="mb-3 flex items-center justify-between">
                             <h2 className="text-sm font-semibold text-gray-800 mb-1">Working on</h2>
+                            <button 
+                                onClick={() => setShowNotePopup(true)}
+                                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                            >
+                                <span>Add note</span>
+                            </button>
                         </div>
 
                         <div className="relative project-dropdown-container">
@@ -849,7 +908,7 @@ function AppContent() {
                                             setIsTimerOperationPending(true);
 
                                             if (!isRunning) {
-                                                const result = await window.pywebview.api.start_timer(selectedProject);
+                                                const result = await window.pywebview.api.start_timer(selectedProject, userNote);
                                                 if (result.success) {
                                                     setSessionInfo(result.data);
                                                     setIsRunning(true);
