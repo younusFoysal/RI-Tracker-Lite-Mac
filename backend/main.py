@@ -2706,6 +2706,7 @@ class Api:
             # User cancelled, prevent window from closing
             return False
 
+
 if __name__ == '__main__':
     # Print database path information for debugging
     print(f"Database path: {db_file}")
