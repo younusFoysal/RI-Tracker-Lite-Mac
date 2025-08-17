@@ -2,14 +2,23 @@
 
 1. PyInstaller Build Command for macOS with App Icon
 ```
+# from project root:
+cd backend
+
 pyinstaller \
   --onefile \
   --windowed \
   --name "RI Tracker" \
   --icon=icon.icns \
+  --hidden-import=AppKit \
+  --hidden-import=objc \
+  --hidden-import=PyObjCTools \
+  --hidden-import=PyObjCTools.AppHelper \
   --add-data=dist:dist \
   main.py
 
+# go back to root (optional) when done
+cd ..
 ```
 
 2. Copy
@@ -38,3 +47,4 @@ create-dmg \
   --background "dmg-build/background/bg.png" \
 ```
 
+hiddenimports=['AppKit', 'PyObjCTools', 'PyObjCTools.AppHelper', 'objc'],

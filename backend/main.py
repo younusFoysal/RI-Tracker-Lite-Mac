@@ -48,6 +48,27 @@ except ImportError:
     PYNPUT_AVAILABLE = False
     MACOS_PERMISSIONS_CHECKED = False
 
+# Optional macOS Status Bar support (PyObjC)
+MAC_MENU_AVAILABLE = False
+HAVE_APPHELPER = False
+if platform.system() == 'Darwin':
+    try:
+        import AppKit  # PyObjC AppKit bridge
+        MAC_MENU_AVAILABLE = True
+        try:
+            from PyObjCTools import AppHelper
+            HAVE_APPHELPER = True
+        except Exception:
+            HAVE_APPHELPER = False
+    except Exception as _e:
+        # AppKit not available; menu bar display will be disabled gracefully
+        MAC_MENU_AVAILABLE = False
+        HAVE_APPHELPER = False
+        # One-time diagnostic to help identify packaging issues
+        print("macOS detected but AppKit is not available. Status bar timer will be disabled.\n"
+              "If you are running a packaged app, ensure PyInstaller includes hidden imports: "
+              "AppKit, objc, PyObjCTools, PyObjCTools.AppHelper.")
+
 
 APP_NAME = "RI_Tracker"
 APP_VERSION = "1.0.14"  # Current version of the application
@@ -179,6 +200,12 @@ class Api:
         self.link_timer = None
         self.links_for_session = []  # List to store links for the current session update
         self.supported_browsers = ['chrome', 'brave', 'edge', 'firefox', 'safari']
+        
+        # macOS menu bar timer variables
+        self.menubar_item = None
+        self.menubar_update_thread = None
+        self.menubar_stop_event = threading.Event()
+        self._menubar_error_logged = False
         
         self.load_auth_data()
 
@@ -902,6 +929,112 @@ class Api:
         
         print(f"Screenshot scheduled in {random_interval} seconds ({random_interval/60:.1f} minutes)")
     
+    def _format_elapsed(self):
+        if not self.start_time:
+            return "00:00:00"
+        elapsed = int(time.time() - self.start_time)
+        h = elapsed // 3600
+        m = (elapsed % 3600) // 60
+        s = elapsed % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    def _ensure_menubar_item(self):
+        """Create macOS menu bar status item if available and not already created."""
+        if not (platform.system() == 'Darwin' and MAC_MENU_AVAILABLE):
+            return
+        if self.menubar_item is not None:
+            return
+        try:
+            status_bar = AppKit.NSStatusBar.systemStatusBar()
+            # Create a variable-length status item so the time fits
+            self.menubar_item = status_bar.statusItemWithLength_(AppKit.NSVariableStatusItemLength)
+            # Set initial title
+            initial = self._format_elapsed()
+            try:
+                # Some versions prefer setting on button()
+                if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
+                    self.menubar_item.button().setTitle_(initial)
+                else:
+                    self.menubar_item.setTitle_(initial)
+            except Exception:
+                self.menubar_item.setTitle_(initial)
+            # Optional tooltip
+            try:
+                self.menubar_item.setToolTip_("RI Tracker - Timer Running")
+            except Exception:
+                pass
+        except Exception as e:
+            if not self._menubar_error_logged:
+                print(f"Failed to create macOS status bar item: {e}")
+                self._menubar_error_logged = True
+
+    def _update_menubar_title(self, text):
+        """Thread-safe update for status item title on macOS."""
+        if not self.menubar_item:
+            return
+        try:
+            if HAVE_APPHELPER:
+                # Schedule on main thread
+                try:
+                    if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
+                        AppHelper.callAfter(self.menubar_item.button().setTitle_, text)
+                    else:
+                        AppHelper.callAfter(self.menubar_item.setTitle_, text)
+                except Exception:
+                    AppHelper.callAfter(self.menubar_item.setTitle_, text)
+            else:
+                # Best-effort direct call
+                try:
+                    if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
+                        self.menubar_item.button().setTitle_(text)
+                    else:
+                        self.menubar_item.setTitle_(text)
+                except Exception:
+                    self.menubar_item.setTitle_(text)
+        except Exception as e:
+            if not self._menubar_error_logged:
+                print(f"Failed to update macOS status bar title: {e}")
+                self._menubar_error_logged = True
+
+    def _start_menubar_updates(self):
+        if not (platform.system() == 'Darwin' and MAC_MENU_AVAILABLE):
+            return
+        self._ensure_menubar_item()
+        # If already running, do nothing
+        if self.menubar_update_thread and self.menubar_update_thread.is_alive():
+            return
+        self.menubar_stop_event.clear()
+        def runner():
+            while not self.menubar_stop_event.is_set() and self.start_time:
+                text = self._format_elapsed()
+                self._update_menubar_title(text)
+                # Wait up to 1 second, exit early if stop requested
+                if self.menubar_stop_event.wait(1.0):
+                    break
+        self.menubar_update_thread = threading.Thread(target=runner, name="MenuBarTimer", daemon=True)
+        self.menubar_update_thread.start()
+
+    def _stop_menubar_updates(self):
+        if not (platform.system() == 'Darwin' and MAC_MENU_AVAILABLE):
+            return
+        try:
+            self.menubar_stop_event.set()
+            if self.menubar_update_thread and self.menubar_update_thread.is_alive():
+                self.menubar_update_thread.join(timeout=1.5)
+        except Exception:
+            pass
+        # Remove the status item
+        try:
+            if self.menubar_item is not None:
+                AppKit.NSStatusBar.systemStatusBar().removeStatusItem_(self.menubar_item)
+        except Exception as e:
+            # If removal fails, just clear reference
+            if not self._menubar_error_logged:
+                print(f"Failed to remove macOS status bar item: {e}")
+                self._menubar_error_logged = True
+        self.menubar_item = None
+        self.menubar_update_thread = None
+
     def start_timer(self, project_name, user_note="I am working on Task"):
         """Start the timer and create a new session
 
@@ -933,6 +1066,9 @@ class Api:
         self.last_active_check_time = current_time
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
+        
+        # Start/ensure macOS menu bar timer display
+        self._start_menubar_updates()
         
         # Reset screenshot variables
         self.screenshots_for_session = []
@@ -1059,6 +1195,9 @@ class Api:
                     "daily": daily_stats,
                     "weekly": weekly_stats
                 }
+            
+            # Stop/clear macOS menu bar timer display
+            self._stop_menubar_updates()
             
             # Reset timer state
             self.start_time = None
