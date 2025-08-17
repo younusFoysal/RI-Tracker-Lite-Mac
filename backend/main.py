@@ -54,6 +54,8 @@ HAVE_APPHELPER = False
 if platform.system() == 'Darwin':
     try:
         import AppKit  # PyObjC AppKit bridge
+        from Foundation import NSObject
+        import objc
         MAC_MENU_AVAILABLE = True
         try:
             from PyObjCTools import AppHelper
@@ -69,9 +71,42 @@ if platform.system() == 'Darwin':
               "If you are running a packaged app, ensure PyInstaller includes hidden imports: "
               "AppKit, objc, PyObjCTools, PyObjCTools.AppHelper.")
 
+    # Define a small delegate for menu actions if AppKit is available
+    if MAC_MENU_AVAILABLE:
+        try:
+            class RiMenuDelegate(NSObject):
+                def initWithApi_(self, api):
+                    self = objc.super(RiMenuDelegate, self).init()
+                    if self is None:
+                        return None
+                    self._api = api
+                    return self
+
+                def openApp_(self, sender):
+                    try:
+                        if getattr(self, '_api', None) is not None and getattr(self._api, 'window', None) is not None:
+                            try:
+                                self._api.window.show()
+                            except Exception:
+                                pass
+                            try:
+                                AppKit.NSApp.activateIgnoringOtherApps_(True)
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        print(f"Failed to open app from menu: {e}")
+
+                def quitApp_(self, sender):
+                    try:
+                        AppKit.NSApp.terminate_(None)
+                    except Exception:
+                        os._exit(0)
+        except Exception as _e_def:
+            print(f"Failed to define RiMenuDelegate: {_e_def}")
+
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.13"  # Current version of the application
+APP_VERSION = "1.0.15"  # Current version of the application
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Mac-Releases"
 # Define platform-specific data directory
 # macOS: Use ~/Library/Application Support which is the standard location for application data
@@ -206,6 +241,7 @@ class Api:
         self.menubar_update_thread = None
         self.menubar_stop_event = threading.Event()
         self._menubar_error_logged = False
+        self._menubar_delegate = None  # Keep a strong ref to menu delegate to avoid GC
         
         self.load_auth_data()
 
@@ -939,30 +975,52 @@ class Api:
         return f"{h:02d}:{m:02d}:{s:02d}"
 
     def _ensure_menubar_item(self):
-        """Create macOS menu bar status item if available and not already created."""
+        """Create macOS menu bar status item if available and not already created.
+        Also attach a small menu with Open App and Quit actions.
+        """
         if not (platform.system() == 'Darwin' and MAC_MENU_AVAILABLE):
             return
-        if self.menubar_item is not None:
-            return
         try:
-            status_bar = AppKit.NSStatusBar.systemStatusBar()
-            # Create a variable-length status item so the time fits
-            self.menubar_item = status_bar.statusItemWithLength_(AppKit.NSVariableStatusItemLength)
+            # Create status item if needed
+            if self.menubar_item is None:
+                status_bar = AppKit.NSStatusBar.systemStatusBar()
+                self.menubar_item = status_bar.statusItemWithLength_(AppKit.NSVariableStatusItemLength)
+
             # Set initial title
             initial = self._format_elapsed()
             try:
-                # Some versions prefer setting on button()
                 if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
                     self.menubar_item.button().setTitle_(initial)
                 else:
                     self.menubar_item.setTitle_(initial)
             except Exception:
                 self.menubar_item.setTitle_(initial)
+
             # Optional tooltip
             try:
-                self.menubar_item.setToolTip_("RI Tracker - Timer Running")
+                self.menubar_item.setToolTip_("RI Tracker - Timer")
             except Exception:
                 pass
+
+            # Attach dropdown menu with actions
+            try:
+                # Create delegate once and keep a strong reference
+                if self._menubar_delegate is None and 'RiMenuDelegate' in globals():
+                    self._menubar_delegate = RiMenuDelegate.alloc().initWithApi_(self)
+
+                menu = AppKit.NSMenu.alloc().init()
+                open_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Open App", "openApp:", "")
+                quit_item = AppKit.NSMenuItem.alloc().initWithTitle_action_keyEquivalent_("Quit", "quitApp:", "")
+                if self._menubar_delegate is not None:
+                    open_item.setTarget_(self._menubar_delegate)
+                    quit_item.setTarget_(self._menubar_delegate)
+                menu.addItem_(open_item)
+                menu.addItem_(quit_item)
+                self.menubar_item.setMenu_(menu)
+            except Exception as e:
+                if not self._menubar_error_logged:
+                    print(f"Failed to attach macOS status bar menu: {e}")
+                    self._menubar_error_logged = True
         except Exception as e:
             if not self._menubar_error_logged:
                 print(f"Failed to create macOS status bar item: {e}")
@@ -1023,16 +1081,30 @@ class Api:
                 self.menubar_update_thread.join(timeout=1.5)
         except Exception:
             pass
-        # Remove the status item
+        # Keep the status item visible but reset title
         try:
             if self.menubar_item is not None:
-                AppKit.NSStatusBar.systemStatusBar().removeStatusItem_(self.menubar_item)
+                text = "00:00:00"
+                if HAVE_APPHELPER:
+                    try:
+                        if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
+                            AppHelper.callAfter(self.menubar_item.button().setTitle_, text)
+                        else:
+                            AppHelper.callAfter(self.menubar_item.setTitle_, text)
+                    except Exception:
+                        AppHelper.callAfter(self.menubar_item.setTitle_, text)
+                else:
+                    try:
+                        if hasattr(self.menubar_item, 'button') and self.menubar_item.button() is not None:
+                            self.menubar_item.button().setTitle_(text)
+                        else:
+                            self.menubar_item.setTitle_(text)
+                    except Exception:
+                        self.menubar_item.setTitle_(text)
         except Exception as e:
-            # If removal fails, just clear reference
             if not self._menubar_error_logged:
-                print(f"Failed to remove macOS status bar item: {e}")
+                print(f"Failed to reset macOS status bar title: {e}")
                 self._menubar_error_logged = True
-        self.menubar_item = None
         self.menubar_update_thread = None
 
     def start_timer(self, project_name, user_note="I am working on Task"):
@@ -3043,8 +3115,8 @@ if __name__ == '__main__':
     # Determine if we're in development or production mode
     #DEBUG = True
     DEBUG = URLS["DEBUG"]
-    # if len(sys.argv) > 1 and sys.argv[1] == '--dev':
-    #     DEBUG = True
+    if len(sys.argv) > 1 and sys.argv[1] == '--dev':
+        DEBUG = True
 
     # Handle PyInstaller bundled resources
     # When running as a PyInstaller executable, resources are in a temporary directory
@@ -3085,6 +3157,13 @@ if __name__ == '__main__':
 
     # Store window reference in the API instance
     api.window = window
+
+    # Ensure macOS menu bar item is created at startup (shows 00:00:00 when idle)
+    if platform.system() == 'Darwin' and MAC_MENU_AVAILABLE:
+        try:
+            api._ensure_menubar_item()
+        except Exception as e:
+            print(f"Failed to initialize macOS menu bar item at startup: {e}")
 
     # Set up the on_closing event handler
     window.events.closing += api.handle_close_event
