@@ -1120,7 +1120,15 @@ class Api:
             self.macos_permissions_checked = False
             # Informative log only; no prompts
             print("macOS detected: Skipping Input Monitoring. Using browser events for activity tracking.")
+
+        # First, try to create the session via API
+        result = self.create_session(user_note)
         
+        # If session creation failed, do not start any timers or menu bar updates
+        if not result.get("success"):
+            return result
+        
+        # Only after successful session creation, start the local timer and trackers
         current_time = time.time()
         self.start_time = current_time
         self.current_project = project_name
@@ -1139,7 +1147,7 @@ class Api:
         self.last_keyboard_event_time = 0
         self.last_mouse_event_time = 0
         
-        # Start/ensure macOS menu bar timer display
+        # Start/ensure macOS menu bar timer display (now aligned with app timer start)
         self._start_menubar_updates()
         
         # Reset screenshot variables
@@ -1177,16 +1185,13 @@ class Api:
         # Start stats updates
         stats = self.start_stats_updates()
         
-        # Create a new session
-        result = self.create_session(user_note)
-        
         # Start session updates (every 10 minutes)
         self.start_session_updates()
         
         # Add stats to the result
         if result.get("success"):
             result["stats"] = stats
-            
+        
         return result
 
     def stop_timer(self):
