@@ -71,7 +71,7 @@ if platform.system() == 'Darwin':
 
 
 APP_NAME = "RI_Tracker"
-APP_VERSION = "1.0.14"  # Current version of the application
+APP_VERSION = "1.0.13"  # Current version of the application
 GITHUB_REPO = "RemoteIntegrity/RI-Tracker-Lite-Mac-Releases"
 # Define platform-specific data directory
 # macOS: Use ~/Library/Application Support which is the standard location for application data
@@ -2755,33 +2755,56 @@ class Api:
         try:
             # Get the latest release from GitHub
             response = requests.get(f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest")
-            
+
             if response.status_code != 200:
                 return {
                     "success": False,
                     "message": f"Failed to check for updates. Status code: {response.status_code}"
                 }
-                
+
             release_data = response.json()
             latest_version = release_data.get('tag_name', '').lstrip('v')
-            
+
             # If no version found, return error
             if not latest_version:
                 return {
                     "success": False,
                     "message": "Could not determine latest version"
                 }
-                
+
+            # Determine best asset for this platform
+            assets = release_data.get('assets') or []
+            download_url = ''
+            platform_name = platform.system()
+            if assets:
+                # Try to find a platform-specific asset
+                if platform_name == 'Darwin':
+                    # Prefer .dmg, fallback to .zip containing .app
+                    dmg = next((a for a in assets if a.get('name', '').lower().endswith('.dmg')), None)
+                    zip_app = next((a for a in assets if a.get('name', '').lower().endswith('.zip')), None)
+                    candidate = dmg or zip_app
+                    if candidate:
+                        download_url = candidate.get('browser_download_url', '')
+                elif platform_name == 'Windows':
+                    exe = next((a for a in assets if a.get('name', '').lower().endswith('.exe')), None)
+                    msi = next((a for a in assets if a.get('name', '').lower().endswith('.msi')), None)
+                    candidate = exe or msi
+                    if candidate:
+                        download_url = candidate.get('browser_download_url', '')
+                else:
+                    # Linux or others: pick first available
+                    download_url = assets[0].get('browser_download_url', '')
+
             # Compare versions
             update_available = self.compare_versions(APP_VERSION, latest_version)
-            
+
             return {
                 "success": True,
                 "update_available": update_available,
                 "current_version": APP_VERSION,
                 "latest_version": latest_version,
                 "release_notes": release_data.get('body', ''),
-                "download_url": release_data.get('assets', [{}])[0].get('browser_download_url', '') if release_data.get('assets') else ''
+                "download_url": download_url
             }
         except Exception as e:
             print(f"Error checking for updates: {e}")
@@ -2835,40 +2858,123 @@ class Api:
                     "success": False,
                     "message": "Update file not found"
                 }
-                
+
             # Get file extension
             _, ext = os.path.splitext(file_path)
-            
-            # Handle different file types
-            if ext.lower() == '.exe':
-                # For Windows executable installers
-                # Start the installer and exit current app
-                subprocess.Popen([file_path, '/SILENT', '/CLOSEAPPLICATIONS'])
-                # Schedule app exit
+
+            # macOS DMG handling
+            if platform.system() == 'Darwin' and ext.lower() == '.dmg':
+                try:
+                    volumes_dir = '/Volumes'
+                    before_vols = set(os.listdir(volumes_dir))
+                except Exception:
+                    before_vols = set()
+
+                # Attach DMG
+                attach_cmd = ['hdiutil', 'attach', file_path, '-nobrowse']
+                try:
+                    subprocess.check_output(attach_cmd, stderr=subprocess.STDOUT)
+                except subprocess.CalledProcessError as e:
+                    return {"success": False, "message": f"Failed to mount DMG: {e.output.decode(errors='ignore')}"}
+
+                # Find new mount point
+                time.sleep(0.5)
+                try:
+                    after_vols = set(os.listdir(volumes_dir))
+                except Exception:
+                    after_vols = set()
+                new_vols = list(after_vols - before_vols)
+                mount_point = None
+                if new_vols:
+                    # Pick the first new volume
+                    mount_point = os.path.join(volumes_dir, new_vols[0])
+                else:
+                    # Fallback: try to parse via hdiutil info
+                    try:
+                        info_out = subprocess.check_output(['hdiutil', 'info']).decode('utf-8', errors='ignore')
+                        for line in info_out.splitlines():
+                            if line.strip().startswith('/Volumes/'):
+                                mount_point = line.strip()
+                                break
+                    except Exception:
+                        pass
+
+                if not mount_point or not os.path.exists(mount_point):
+                    return {"success": False, "message": "Could not determine DMG mount point"}
+
+                # Locate .app inside the mounted volume
+                app_bundle = None
+                for root, dirs, files in os.walk(mount_point):
+                    for d in dirs:
+                        if d.endswith('.app'):
+                            app_bundle = os.path.join(root, d)
+                            break
+                    if app_bundle:
+                        break
+
+                if not app_bundle:
+                    # Detach and error
+                    try:
+                        subprocess.call(['hdiutil', 'detach', mount_point, '-force'])
+                    finally:
+                        return {"success": False, "message": "No .app found inside DMG"}
+
+                dest_app = os.path.join('/Applications', os.path.basename(app_bundle))
+
+                # Copy using 'ditto' for best results on macOS
+                try:
+                    # Ensure destination directory exists or remove old app to replace
+                    if os.path.exists(dest_app):
+                        # Attempt to replace existing app
+                        subprocess.call(['rm', '-rf', dest_app])
+                    subprocess.check_call(['ditto', app_bundle, dest_app])
+                except subprocess.CalledProcessError as e:
+                    # Try fallback copy
+                    try:
+                        if os.path.exists(dest_app):
+                            shutil.rmtree(dest_app)
+                        shutil.copytree(app_bundle, dest_app)
+                    except Exception as copy_err:
+                        # Detach then fail
+                        subprocess.call(['hdiutil', 'detach', mount_point, '-force'])
+                        return {"success": False, "message": f"Failed to copy app: {copy_err}"}
+
+                # Detach DMG
+                subprocess.call(['hdiutil', 'detach', mount_point, '-force'])
+
+                # Relaunch installed app and exit current
+                try:
+                    subprocess.Popen(['open', dest_app])
+                except Exception:
+                    pass
                 threading.Timer(1.0, lambda: os._exit(0)).start()
                 return {"success": True, "message": "Installing update..."}
-                
+
+            # Handle different file types (Windows etc.)
+            if ext.lower() == '.exe':
+                # For Windows executable installers
+                subprocess.Popen([file_path, '/SILENT', '/CLOSEAPPLICATIONS'])
+                threading.Timer(1.0, lambda: os._exit(0)).start()
+                return {"success": True, "message": "Installing update..."}
+
             elif ext.lower() == '.msi':
                 # For MSI installers
                 subprocess.Popen(['msiexec', '/i', file_path, '/quiet', '/norestart'])
                 threading.Timer(1.0, lambda: os._exit(0)).start()
                 return {"success": True, "message": "Installing update..."}
-                
+
             elif ext.lower() in ['.zip', '.7z']:
-                # For zip archives, extract and replace current executable
-                # This is a simplified example - actual implementation would depend on your app structure
-                # You might need to extract files, copy them to the right location, etc.
                 return {
                     "success": False,
                     "message": "Archive installation not implemented"
                 }
-                
+
             else:
                 return {
                     "success": False,
                     "message": f"Unsupported update file type: {ext}"
                 }
-                
+
         except Exception as e:
             print(f"Error installing update: {e}")
             return {
